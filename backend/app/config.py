@@ -17,9 +17,13 @@ class Config:
     ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "")
     # 设置 DATABASE_URL 后即切换到 Supabase PostgreSQL；
     # 未设置时仍使用本地 SQLite，方便本地开发。
-    SQLALCHEMY_DATABASE_URI = os.environ.get("DATABASE_URL") or (
+    _database_url = os.environ.get("DATABASE_URL") or (
         "sqlite:///" + os.path.join(INSTANCE_DIR, "novel.db")
     )
+    # 标准 postgresql:// 连接串自动归一化到 psycopg3 方言
+    if _database_url.startswith("postgresql://"):
+        _database_url = "postgresql+psycopg://" + _database_url[len("postgresql://") :]
+    SQLALCHEMY_DATABASE_URI = _database_url
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
     SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
