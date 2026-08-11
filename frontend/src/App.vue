@@ -1,16 +1,24 @@
 <script setup>
-import { useRoute } from "vue-router";
+import { ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { Moon, Sunny } from "@element-plus/icons-vue";
 import { useThemeStore } from "./stores/theme";
 
 const route = useRoute();
+const router = useRouter();
 const theme = useThemeStore();
+const searchKeyword = ref("");
 
 const navs = [
   { name: "home", label: "首页", path: "/" },
   { name: "message-board", label: "留言板", path: "/message-board" },
   { name: "admin", label: "管理后台", path: "/admin" },
 ];
+
+function doSearch() {
+  const q = searchKeyword.value.trim();
+  router.push({ path: "/", query: q ? { q } : {} });
+}
 </script>
 
 <template>
@@ -20,18 +28,29 @@ const navs = [
         <router-link to="/" class="brand">
           <span class="brand-e">E</span>sfone
         </router-link>
+        <nav class="nav-anchor">
+          <router-link
+            v-for="item in navs"
+            :key="item.name"
+            :to="item.path"
+            class="nav-link"
+            :class="{ active: route.path === item.path }"
+          >
+            {{ item.label }}
+          </router-link>
+        </nav>
         <div class="header-right">
-          <nav class="nav">
-            <router-link
-              v-for="item in navs"
-              :key="item.name"
-              :to="item.path"
-              class="nav-link"
-              :class="{ active: route.path === item.path }"
-            >
-              {{ item.label }}
-            </router-link>
-          </nav>
+          <div class="search-box">
+            <el-input
+              v-model="searchKeyword"
+              placeholder="搜索书名 / 作者"
+              class="search-input"
+              clearable
+              @keyup.enter="doSearch"
+              @clear="doSearch"
+            />
+            <el-button class="search-btn" @click="doSearch">查询</el-button>
+          </div>
           <el-button
             class="theme-toggle"
             circle
@@ -71,21 +90,15 @@ const navs = [
 
 .header-inner {
   width: 100%;
-  padding: 18px 28px 18px 44px;
   min-height: 110px;
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr minmax(0, 1080px) 1fr;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 16px;
 }
 
 .brand {
+  justify-self: start;
+  margin-left: 44px;
   color: #fff;
   font-family: Georgia, "Times New Roman", "Songti SC", serif;
   font-size: 40px;
@@ -103,12 +116,14 @@ const navs = [
   color: transparent;
 }
 
-.nav {
+.nav-anchor {
+  justify-self: start;
   display: flex;
   gap: 10px;
+  padding-left: 16px;
 }
 
-.nav-link {
+.nav-anchor .nav-link {
   color: rgba(255, 255, 255, 0.82);
   padding: 8px 18px;
   border-radius: 6px;
@@ -116,15 +131,45 @@ const navs = [
   transition: all 0.2s;
 }
 
-.nav-link:hover {
+.nav-anchor .nav-link:hover {
   color: #fff;
   background: rgba(255, 255, 255, 0.14);
 }
 
-.nav-link.active {
+.nav-anchor .nav-link.active {
   color: #fff;
   background: rgba(255, 255, 255, 0.2);
   font-weight: 600;
+}
+
+.header-right {
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-right: 28px;
+}
+
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.search-input {
+  width: 200px;
+}
+
+.search-btn {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.35);
+  color: #fff;
+}
+
+.search-btn:hover {
+  background: rgba(255, 255, 255, 0.28);
+  border-color: rgba(255, 255, 255, 0.5);
+  color: #fff;
 }
 
 .theme-toggle {
@@ -157,32 +202,61 @@ main {
   margin: 0;
 }
 
-@media (max-width: 720px) {
+@media (max-width: 1111px) {
   .header-inner {
     min-height: 88px;
     padding: 12px 14px 12px 24px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px 14px;
+  }
+
+  .brand {
+    margin-left: 0;
+  }
+
+  .nav-anchor {
+    order: 3;
+    width: 100%;
+    padding-left: 2px;
+  }
+
+  .header-right {
+    margin-right: 0;
+  }
+
+  .search-input {
+    width: 150px;
+  }
+}
+
+@media (max-width: 720px) {
+  .header-inner {
+    min-height: 80px;
   }
 
   .brand {
     font-size: 30px;
   }
 
-  .nav {
+  .nav-anchor {
     gap: 6px;
   }
 
-  .nav-link {
+  .nav-anchor .nav-link {
     font-size: 15px;
     padding: 6px 12px;
-  }
-
-  .header-right {
-    gap: 10px;
   }
 
   .theme-toggle {
     width: 38px;
     height: 38px;
+  }
+
+  .search-input {
+    width: 130px;
   }
 }
 </style>

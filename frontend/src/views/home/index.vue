@@ -1,25 +1,37 @@
 <script setup>
-import { onMounted, ref } from "vue";
+import { onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
+import { useRoute } from "vue-router";
 import { getBooks } from "../../api/books";
 import defaultCover from "../../assets/default-cover.png";
 import { useThemeStore } from "../../stores/theme";
 
 const router = useRouter();
+const route = useRoute();
 const theme = useThemeStore();
 const books = ref([]);
 const loading = ref(true);
+const keyword = ref("");
 
-onMounted(async () => {
+async function loadBooks() {
+  loading.value = true;
+  keyword.value = route.query.q || "";
   try {
-    const data = await getBooks();
+    const data = await getBooks(keyword.value || undefined);
     books.value = data.books || [];
   } catch {
     // 错误提示由拦截器统一处理
   } finally {
     loading.value = false;
   }
-});
+}
+
+onMounted(loadBooks);
+watch(() => route.query.q, loadBooks);
+
+function clearSearch() {
+  router.push({ path: "/" });
+}
 
 function openBook(book) {
   router.push(`/book/${book.id}`);
@@ -28,7 +40,12 @@ function openBook(book) {
 
 <template>
   <div class="page-container">
-    <h1 class="page-title">全部书籍</h1>
+    <h1 class="page-title">
+      {{ keyword ? `搜索“${keyword}”的结果` : "全部书籍" }}
+      <el-button v-if="keyword" link type="primary" class="clear-search" @click="clearSearch">
+        清除搜索
+      </el-button>
+    </h1>
 
     <div v-loading="loading" class="book-grid">
       <div v-for="book in books" :key="book.id" class="book-card" @click="openBook(book)">
@@ -55,6 +72,12 @@ function openBook(book) {
 </template>
 
 <style scoped>
+.clear-search {
+  font-size: 14px;
+  margin-left: 10px;
+  vertical-align: 3px;
+}
+
 .book-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));

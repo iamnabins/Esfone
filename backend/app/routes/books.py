@@ -1,6 +1,7 @@
 """书籍相关接口"""
 
 from flask import Blueprint, jsonify, request
+from sqlalchemy import or_
 
 from ..extensions import db
 from ..models import Book, Chapter
@@ -11,8 +12,13 @@ books_bp = Blueprint("books", __name__, url_prefix="/api/books")
 
 @books_bp.get("")
 def list_books():
-    """获取所有书籍列表（公开）。"""
-    books = Book.query.order_by(Book.created_at.desc()).all()
+    """获取书籍列表（公开）。支持 ?q=关键词 按书名/作者模糊搜索。"""
+    q = (request.args.get("q") or "").strip()
+    query = Book.query
+    if q:
+        like = f"%{q}%"
+        query = query.filter(or_(Book.title.ilike(like), Book.author.ilike(like)))
+    books = query.order_by(Book.created_at.desc()).all()
     return jsonify({"books": [b.to_summary() for b in books]})
 
 

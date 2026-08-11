@@ -1,7 +1,7 @@
 import http from "./http";
 
-export function getBooks() {
-  return http.get("/api/books");
+export function getBooks(q) {
+  return http.get("/api/books", { params: q ? { q } : {} });
 }
 
 export function getBook(bookId) {
