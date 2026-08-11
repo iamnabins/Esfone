@@ -88,6 +88,35 @@ a {
   margin-bottom: 0;
 }
 
+/* 用户悬浮信息卡（弹层内容在 body 下，需全局样式） */
+.user-info {
+  text-align: left;
+}
+
+.user-nickname {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.user-email {
+  margin: 0 0 4px;
+  font-size: 13px;
+  color: var(--text-light);
+  word-break: break-all;
+}
+
+.user-meta {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--text-light);
+}
+
+.logout-btn {
+  width: 100%;
+}
+
 /* 主题切换时的全局渐变动画（仅切换瞬间生效，避免影响普通 hover 动画） */
 html.theme-transition *,
 html.theme-transition *::before,

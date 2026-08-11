@@ -1,12 +1,15 @@
 <script setup>
-import { nextTick, ref } from "vue";
+import { nextTick, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { Moon, Search, Sunny } from "@element-plus/icons-vue";
+import { ElMessage } from "element-plus";
+import { Moon, Search, Sunny, User } from "@element-plus/icons-vue";
 import { useThemeStore } from "./stores/theme";
+import { useAuthStore } from "./stores/auth";
 
 const route = useRoute();
 const router = useRouter();
 const theme = useThemeStore();
+const auth = useAuthStore();
 const searchKeyword = ref("");
 const searchOpen = ref(false);
 const searchInputRef = ref(null);
@@ -17,6 +20,10 @@ const navs = [
   { name: "message-board", label: "留言板", path: "/message-board" },
   { name: "admin", label: "管理后台", path: "/admin" },
 ];
+
+onMounted(() => {
+  auth.init();
+});
 
 function doSearch() {
   const q = searchKeyword.value.trim();
@@ -29,6 +36,18 @@ async function toggleSearch() {
     await nextTick();
     searchInputRef.value?.focus();
   }
+}
+
+function formatCreatedAt(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("zh-CN");
+}
+
+async function handleLogout() {
+  await auth.signOut();
+  ElMessage.success("已退出登录");
 }
 </script>
 
@@ -81,6 +100,29 @@ async function toggleSearch() {
               </el-icon>
             </el-button>
           </div>
+          <el-popover
+            v-if="auth.isLoggedIn"
+            placement="bottom"
+            :width="260"
+            trigger="hover"
+          >
+            <template #reference>
+              <el-button class="user-toggle" circle :title="auth.nickname || auth.user?.email">
+                <el-icon :size="18">
+                  <User />
+                </el-icon>
+              </el-button>
+            </template>
+            <div class="user-info">
+              <p class="user-nickname">{{ auth.nickname || "未设置昵称" }}</p>
+              <p class="user-email">{{ auth.user?.email }}</p>
+              <p class="user-meta">注册于 {{ formatCreatedAt(auth.user?.created_at) }}</p>
+              <el-button type="danger" plain size="small" class="logout-btn" @click="handleLogout">
+                退出登录
+              </el-button>
+            </div>
+          </el-popover>
+          <el-button v-else class="auth-btn" @click="router.push('/auth')">登录 / 注册</el-button>
           <el-button
             class="theme-toggle"
             circle
@@ -251,6 +293,32 @@ async function toggleSearch() {
   color: #fff;
 }
 
+.auth-btn {
+  height: 40px;
+  padding: 0 14px;
+  background: rgba(255, 255, 255, 0.12);
+  border-color: transparent;
+  color: #fff;
+}
+
+.auth-btn:hover {
+  background: rgba(255, 255, 255, 0.24);
+  color: #fff;
+}
+
+.user-toggle {
+  width: 44px;
+  height: 44px;
+  background: rgba(255, 255, 255, 0.12);
+  border-color: transparent;
+  color: #fff;
+}
+
+.user-toggle:hover {
+  background: rgba(255, 255, 255, 0.24);
+  color: #fff;
+}
+
 .theme-toggle {
   width: 44px;
   height: 44px;
@@ -341,6 +409,17 @@ main {
   .search-toggle {
     width: 38px;
     height: 38px;
+  }
+
+  .user-toggle {
+    width: 38px;
+    height: 38px;
+  }
+
+  .auth-btn {
+    height: 36px;
+    padding: 0 10px;
+    font-size: 14px;
   }
 }
 </style>

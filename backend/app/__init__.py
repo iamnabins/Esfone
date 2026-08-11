@@ -7,7 +7,7 @@ from flask_cors import CORS
 
 from .config import Config, INSTANCE_DIR
 from .extensions import db
-from .routes import admin_bp, books_bp, chapters_bp, messages_bp
+from .routes import admin_bp, auth_bp, books_bp, chapters_bp, messages_bp
 
 
 def create_app():
@@ -21,6 +21,7 @@ def create_app():
     CORS(app)
 
     app.register_blueprint(admin_bp)
+    app.register_blueprint(auth_bp)
     app.register_blueprint(books_bp)
     app.register_blueprint(chapters_bp)
     app.register_blueprint(messages_bp)
