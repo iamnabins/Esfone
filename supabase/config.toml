@@ -1,0 +1,4 @@
+project_id = "esfone"
+
+[functions.api]
+verify_jwt = false

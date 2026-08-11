@@ -7,10 +7,10 @@
 | 端 | 技术 |
 | :-- | :-- |
 | 前端 | Vue 3 + Vite + Element Plus + Pinia + Vue Router |
-| 后端 | Python 3 + Flask + Flask-SQLAlchemy |
-| 数据库 | SQLite（本地默认）/ Supabase PostgreSQL（可选） |
+| 后端 | 生产：Supabase Edge Functions（Deno）；本地开发：Python 3 + Flask + Flask-SQLAlchemy |
+| 数据库 | Supabase PostgreSQL（本地未配置时可回退 SQLite） |
 | 用户系统 | Supabase Auth |
-| 部署 | Netlify（前端）+ Render（后端） |
+| 部署 | Netlify（前端）+ Supabase Edge Functions（后端） |
 
 ## 功能特性
 
@@ -172,16 +172,34 @@ VITE_SUPABASE_ANON_KEY=eyJ...
 2. 构建命令：`npm run build`；发布目录：`dist`（`netlify.toml` 已配置）。
 3. 环境变量：`VITE_API_BASE=https://你的后端地址`，以及 `VITE_SUPABASE_URL`、`VITE_SUPABASE_ANON_KEY`；设置后重新构建。
 
-### 后端：Render
+### 后端：Supabase Edge Functions
 
-1. 在 Render 新建 Web Service，连接同一个 GitHub 仓库。
-2. 根目录填 `backend`；构建命令：`pip install -r requirements.txt`；启动命令：`gunicorn run:app`。
-3. 环境变量：`ADMIN_TOKEN`（管理员口令）、`SECRET_KEY`，以及接入 Supabase 时的 `DATABASE_URL`、`SUPABASE_URL`、`SUPABASE_ANON_KEY`、`SUPABASE_JWT_SECRET`。
+生产环境后端是一个 Deno 云函数（`supabase/functions/api/index.ts`），路由 `/api/*`，与原 Flask 接口返回结构一致。
+
+1. 部署函数（需 Supabase 管理令牌，或用 Supabase CLI）：
+
+   ```bash
+   supabase functions deploy api --project-ref <项目 ref> --no-verify-jwt
+   ```
+
+   部署完成后设置函数密钥（`SUPABASE_URL`、`SUPABASE_ANON_KEY`、`SUPABASE_SERVICE_ROLE_KEY` 由平台自动注入）：
+
+   ```bash
+   supabase secrets set --project-ref <项目 ref> ADMIN_TOKEN=<管理员口令>
+   ```
+
+2. 前端 `frontend/.env`：
+
+   ```env
+   VITE_API_BASE=https://<项目 ref>.supabase.co/functions/v1/api
+   ```
+
+3. 云函数使用 `service_role` 密钥访问数据库（只存在于函数环境变量中，不会暴露给前端）。
 
 ## 常见问题
 
 **管理员口令是什么？**
-本地开发在 `backend/.env` 的 `ADMIN_TOKEN` 中设置（本地预览示例为 `admin123`）；部署到 Render 时在环境变量里设置。
+本地开发在 `backend/.env` 的 `ADMIN_TOKEN` 中设置（本地预览示例为 `admin123`）；生产环境在云函数密钥（Secrets）中设置。
 
 **怎么把数据库换成 Supabase？**
 在 `backend/.env` 设置 `DATABASE_URL` 指向 Supabase PostgreSQL，并按上文配置 `SUPABASE_*` 变量。
