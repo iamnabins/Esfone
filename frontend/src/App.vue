@@ -180,12 +180,14 @@ async function toggleSearch() {
 
 .search-field {
   width: 0;
+  margin-right: 0;
   overflow: hidden;
-  transition: width 0.25s ease;
+  transition: width 0.25s ease, margin-right 0.25s ease;
 }
 
 .search-box.open .search-field {
   width: 200px;
+  margin-right: -200px;
 }
 
 .search-field .el-input {
@@ -263,6 +265,7 @@ main {
 
   .search-box.open .search-field {
     width: 150px;
+    margin-right: -150px;
   }
 }
 
@@ -291,6 +294,7 @@ main {
 
   .search-box.open .search-field {
     width: 130px;
+    margin-right: -130px;
   }
 
   .search-toggle {
