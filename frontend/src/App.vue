@@ -1,13 +1,15 @@
 <script setup>
-import { ref } from "vue";
+import { nextTick, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { Moon, Sunny } from "@element-plus/icons-vue";
+import { Moon, Search, Sunny } from "@element-plus/icons-vue";
 import { useThemeStore } from "./stores/theme";
 
 const route = useRoute();
 const router = useRouter();
 const theme = useThemeStore();
 const searchKeyword = ref("");
+const searchOpen = ref(false);
+const searchInputRef = ref(null);
 
 const navs = [
   { name: "home", label: "首页", path: "/" },
@@ -18,6 +20,14 @@ const navs = [
 function doSearch() {
   const q = searchKeyword.value.trim();
   router.push({ path: "/", query: q ? { q } : {} });
+}
+
+async function toggleSearch() {
+  searchOpen.value = !searchOpen.value;
+  if (searchOpen.value) {
+    await nextTick();
+    searchInputRef.value?.focus();
+  }
 }
 </script>
 
@@ -40,16 +50,28 @@ function doSearch() {
           </router-link>
         </nav>
         <div class="header-right">
-          <div class="search-box">
-            <el-input
-              v-model="searchKeyword"
-              placeholder="搜索书名 / 作者"
-              class="search-input"
-              clearable
-              @keyup.enter="doSearch"
-              @clear="doSearch"
-            />
-            <el-button class="search-btn" @click="doSearch">查询</el-button>
+          <div class="search-box" :class="{ open: searchOpen }">
+            <div class="search-field">
+              <el-input
+                v-model="searchKeyword"
+                ref="searchInputRef"
+                placeholder="搜索书名 / 作者"
+                clearable
+                @keyup.enter="doSearch"
+                @clear="doSearch"
+              />
+            </div>
+            <el-button
+              class="search-toggle"
+              circle
+              :aria-label="searchOpen ? '收起搜索框' : '展开搜索框'"
+              :title="searchOpen ? '收起搜索框' : '展开搜索框'"
+              @click="toggleSearch"
+            >
+              <el-icon :size="18">
+                <Search />
+              </el-icon>
+            </el-button>
           </div>
           <el-button
             class="theme-toggle"
@@ -156,19 +178,31 @@ function doSearch() {
   gap: 8px;
 }
 
-.search-input {
+.search-field {
+  width: 0;
+  overflow: hidden;
+  transition: width 0.25s ease;
+}
+
+.search-box.open .search-field {
   width: 200px;
 }
 
-.search-btn {
-  background: rgba(255, 255, 255, 0.16);
-  border-color: rgba(255, 255, 255, 0.35);
+.search-field .el-input {
+  width: 100%;
+}
+
+.search-toggle {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  background: rgba(255, 255, 255, 0.12);
+  border-color: transparent;
   color: #fff;
 }
 
-.search-btn:hover {
-  background: rgba(255, 255, 255, 0.28);
-  border-color: rgba(255, 255, 255, 0.5);
+.search-toggle:hover {
+  background: rgba(255, 255, 255, 0.24);
   color: #fff;
 }
 
@@ -227,7 +261,7 @@ main {
     margin-right: 0;
   }
 
-  .search-input {
+  .search-box.open .search-field {
     width: 150px;
   }
 }
@@ -255,8 +289,13 @@ main {
     height: 38px;
   }
 
-  .search-input {
+  .search-box.open .search-field {
     width: 130px;
+  }
+
+  .search-toggle {
+    width: 38px;
+    height: 38px;
   }
 }
 </style>
