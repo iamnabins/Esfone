@@ -7,7 +7,7 @@ auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 
 
 def _decode_token(token):
-    """依次尝试 HS256（项目 JWT 密钥）与 RS256（新项目 JWKS）两种签名方式。"""
+    """依次尝试 HS256（项目 JWT 密钥）与 ES256/RS256（新项目 JWKS）签名方式。"""
     secret = current_app.config.get("SUPABASE_JWT_SECRET") or ""
     if secret:
         try:
@@ -29,7 +29,7 @@ def _decode_token(token):
             return jwt.decode(
                 token,
                 key.key,
-                algorithms=["RS256"],
+                algorithms=["ES256", "RS256"],
                 audience="authenticated",
                 options={"require": ["exp"]},
             )
