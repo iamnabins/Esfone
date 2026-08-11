@@ -196,6 +196,13 @@ async function toggleSearch() {
 
 .search-field .el-input {
   width: 100%;
+  --el-input-bg-color: rgba(255, 255, 255, 0.12);
+  --el-input-border-color: rgba(255, 255, 255, 0.35);
+  --el-input-hover-border-color: rgba(255, 255, 255, 0.55);
+  --el-input-focus-border-color: #ffffff;
+  --el-input-text-color: #ffffff;
+  --el-input-placeholder-color: rgba(255, 255, 255, 0.65);
+  --el-input-icon-color: rgba(255, 255, 255, 0.75);
 }
 
 .search-toggle {
