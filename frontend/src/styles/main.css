@@ -9,6 +9,7 @@
   --cover-bg: #f7f7fa;
   --hover-bg: #f4f2fb;
   --reader-text: #3c3943;
+  --shadow: 0 2px 12px rgba(36, 26, 74, 0.06);
 }
 
 html.dark {
@@ -22,6 +23,7 @@ html.dark {
   --cover-bg: #272730;
   --hover-bg: #2b2b37;
   --reader-text: #d6d3de;
+  --shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
 }
 
 * {
@@ -32,7 +34,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+  font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", system-ui, -apple-system, sans-serif;
 }
 
 a {
@@ -47,15 +49,25 @@ a {
 }
 
 .page-title {
-  font-size: 22px;
+  font-size: 27px;
   font-weight: 700;
-  margin: 8px 0 20px;
+  letter-spacing: 5px;
+  margin: 10px 0 24px;
 }
 
 .card {
   background: var(--card-bg);
-  border-radius: 10px;
+  border-radius: 12px;
   border: 1px solid var(--border);
+  box-shadow: var(--shadow);
   padding: 20px;
   margin-bottom: 20px;
+}
+
+/* 主题切换时的全局渐变动画（仅切换瞬间生效，避免影响普通 hover 动画） */
+html.theme-transition *,
+html.theme-transition *::before,
+html.theme-transition *::after {
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease,
+    fill 0.3s ease, stroke 0.3s ease, box-shadow 0.3s ease !important;
 }

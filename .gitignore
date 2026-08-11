@@ -4,9 +4,9 @@ __pycache__/
 *.pyc
 *.pyo
 
-# 运行时数据（SQLite 数据库目录）
-instance/*
-!instance/.gitkeep
+# 运行时数据（SQLite 数据库目录，匹配任意层级的 instance/）
+**/instance/*
+!**/instance/.gitkeep
 
 # Node
 node_modules/

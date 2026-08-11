@@ -17,7 +17,9 @@ const navs = [
   <div class="app-shell">
     <header class="site-header">
       <div class="header-inner">
-        <router-link to="/" class="brand">个人小说站</router-link>
+        <router-link to="/" class="brand">
+          <span class="brand-e">E</span>sfone
+        </router-link>
         <div class="header-right">
           <nav class="nav">
             <router-link
@@ -51,7 +53,7 @@ const navs = [
     </main>
 
     <footer class="site-footer">
-      <p>个人小说站 · 简洁易读，随心阅读</p>
+      <p>© 2026 Esfone · Made with ❤</p>
     </footer>
   </div>
 </template>
@@ -70,35 +72,48 @@ const navs = [
 .header-inner {
   max-width: 1080px;
   margin: 0 auto;
-  padding: 14px 16px;
+  padding: 18px 24px;
+  min-height: 110px;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
 }
 
 .header-right {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
 }
 
 .brand {
   color: #fff;
-  font-size: 20px;
+  font-family: Georgia, "Times New Roman", "Songti SC", serif;
+  font-size: 40px;
   font-weight: 700;
-  letter-spacing: 1px;
+  letter-spacing: 2px;
+  line-height: 1;
+}
+
+.brand-e {
+  font-size: 1.35em;
+  font-style: italic;
+  background: linear-gradient(135deg, #ffe08a, #ff9f43);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .nav {
   display: flex;
-  gap: 8px;
+  gap: 10px;
 }
 
 .nav-link {
   color: rgba(255, 255, 255, 0.82);
-  padding: 6px 14px;
+  padding: 8px 18px;
   border-radius: 6px;
-  font-size: 14px;
+  font-size: 17px;
   transition: all 0.2s;
 }
 
@@ -114,6 +129,8 @@ const navs = [
 }
 
 .theme-toggle {
+  width: 44px;
+  height: 44px;
   background: rgba(255, 255, 255, 0.12);
   border-color: transparent;
   color: #fff;
@@ -139,5 +156,34 @@ main {
 
 .site-footer p {
   margin: 0;
+}
+
+@media (max-width: 720px) {
+  .header-inner {
+    min-height: 88px;
+    padding: 12px 14px;
+  }
+
+  .brand {
+    font-size: 30px;
+  }
+
+  .nav {
+    gap: 6px;
+  }
+
+  .nav-link {
+    font-size: 15px;
+    padding: 6px 12px;
+  }
+
+  .header-right {
+    gap: 10px;
+  }
+
+  .theme-toggle {
+    width: 38px;
+    height: 38px;
+  }
 }
 </style>

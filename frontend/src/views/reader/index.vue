@@ -83,8 +83,9 @@ function goTo(id) {
 .chapter-content {
   white-space: pre-wrap;
   line-height: 1.9;
-  font-size: 16px;
+  font-size: 17px;
   color: var(--reader-text);
+  font-family: "Songti SC", "Noto Serif SC", "SimSun", Georgia, serif;
   word-break: break-word;
 }
 
