@@ -207,7 +207,7 @@ function readChapter(chapter) {
   display: flex;
   gap: 12px;
   padding: 12px 16px;
-  background: #fff;
+  background: var(--card-bg);
   border-bottom: 1px solid var(--border);
   cursor: pointer;
   transition: background 0.15s;

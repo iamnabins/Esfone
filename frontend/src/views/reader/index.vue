@@ -1,22 +1,21 @@
 <script setup>
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { getChapter } from "../../api/books";
 
 const route = useRoute();
 const router = useRouter();
 
-const bookId = Number(route.params.bookId);
-const chapterId = Number(route.params.chapterId);
+const bookId = computed(() => Number(route.params.bookId));
+const chapterId = computed(() => Number(route.params.chapterId));
 const chapter = ref(null);
 const loading = ref(true);
 
-onMounted(loadChapter);
-
 async function loadChapter() {
   loading.value = true;
+  window.scrollTo({ top: 0 });
   try {
-    const data = await getChapter(chapterId);
+    const data = await getChapter(chapterId.value);
     chapter.value = data.chapter;
   } catch {
     chapter.value = null;
@@ -25,8 +24,12 @@ async function loadChapter() {
   }
 }
 
+onMounted(loadChapter);
+// 在同一本书内切换上一章/下一章时，路由参数变化但组件会复用，需要监听并重新加载
+watch([bookId, chapterId], loadChapter);
+
 function goTo(id) {
-  if (id) router.push(`/read/${bookId}/${id}`);
+  if (id) router.push(`/read/${bookId.value}/${id}`);
 }
 </script>
 

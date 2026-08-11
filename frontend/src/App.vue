@@ -70,8 +70,7 @@ const navs = [
 }
 
 .header-inner {
-  max-width: 1080px;
-  margin: 0 auto;
+  width: 100%;
   padding: 18px 24px;
   min-height: 110px;
   display: flex;
