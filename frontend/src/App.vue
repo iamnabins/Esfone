@@ -173,21 +173,25 @@ async function toggleSearch() {
 }
 
 .search-box {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
 .search-field {
+  position: absolute;
+  right: 52px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
   width: 0;
-  margin-right: 0;
   overflow: hidden;
-  transition: width 0.25s ease, margin-right 0.25s ease;
+  transition: width 0.25s ease;
 }
 
 .search-box.open .search-field {
   width: 200px;
-  margin-right: -200px;
 }
 
 .search-field .el-input {
@@ -265,7 +269,6 @@ main {
 
   .search-box.open .search-field {
     width: 150px;
-    margin-right: -150px;
   }
 }
 
@@ -294,7 +297,6 @@ main {
 
   .search-box.open .search-field {
     width: 130px;
-    margin-right: -130px;
   }
 
   .search-toggle {
