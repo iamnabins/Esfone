@@ -63,7 +63,6 @@ function goTo(id) {
 }
 
 .reader-head {
-  text-align: center;
   margin-bottom: 28px;
 }
 
@@ -81,6 +80,7 @@ function goTo(id) {
 .chapter-title {
   margin: 0;
   font-size: 24px;
+  text-align: center;
 }
 
 .chapter-content {

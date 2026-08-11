@@ -35,6 +35,7 @@ class Book(db.Model):
             "cover": self.cover or "",
             "description": self.description or "",
             "chapter_count": len(self.chapters),
+            "latest_chapter": self.chapters[-1].title if self.chapters else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
 

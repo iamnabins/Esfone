@@ -44,6 +44,7 @@ function openBook(book) {
         </div>
         <div class="book-info">
           <p class="book-title">{{ book.title }}</p>
+          <p class="book-latest">最新章节：{{ book.latest_chapter || "暂无" }}</p>
           <p class="book-author">{{ book.author }}</p>
         </div>
       </div>
@@ -98,6 +99,15 @@ function openBook(book) {
   margin: 0 0 4px;
   font-size: 15px;
   font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.book-latest {
+  margin: 0 0 4px;
+  font-size: 12px;
+  color: var(--text-light);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
