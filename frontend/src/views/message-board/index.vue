@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, ref } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { createMessage, deleteMessage, getMessages } from "../../api/messages";
 import { verifyAdminToken } from "../../api/admin";
@@ -13,6 +13,9 @@ const nickname = ref("");
 const content = ref("");
 const submitting = ref(false);
 const adminTokenInput = ref("");
+const expanded = ref({});
+const hasMore = ref({});
+const contentRefs = ref({});
 
 onMounted(loadMessages);
 
@@ -21,11 +24,28 @@ async function loadMessages() {
   try {
     const data = await getMessages();
     messages.value = data.messages || [];
+    await nextTick();
+    checkOverflow();
   } catch {
     // 拦截器已提示
   } finally {
     loading.value = false;
   }
+}
+
+function checkOverflow() {
+  const next = {};
+  for (const message of messages.value) {
+    const el = contentRefs.value[message.id];
+    if (el) {
+      next[message.id] = el.scrollHeight > el.clientHeight + 1;
+    }
+  }
+  hasMore.value = next;
+}
+
+function toggleMessage(id) {
+  expanded.value[id] = !expanded.value[id];
 }
 
 async function submitMessage() {
@@ -152,7 +172,23 @@ function formatTime(value) {
             删除
           </el-button>
         </div>
-        <p class="message-content">{{ message.content }}</p>
+        <p
+          :ref="(el) => (contentRefs[message.id] = el)"
+          class="message-content"
+          :class="{ expanded: expanded[message.id] }"
+        >
+          {{ message.content }}
+        </p>
+        <el-button
+          v-if="hasMore[message.id]"
+          link
+          type="primary"
+          size="small"
+          class="toggle-btn"
+          @click="toggleMessage(message.id)"
+        >
+          {{ expanded[message.id] ? "收起" : "查看全部" }}
+        </el-button>
       </div>
     </div>
   </div>
@@ -222,5 +258,18 @@ function formatTime(value) {
   line-height: 1.8;
   white-space: pre-wrap;
   word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.message-content.expanded {
+  -webkit-line-clamp: unset;
+}
+
+.toggle-btn {
+  margin-top: 6px;
+  padding: 0;
 }
 </style>
