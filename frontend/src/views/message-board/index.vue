@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { createMessage, deleteMessage, getMessages } from "../../api/messages";
+import { verifyAdminToken } from "../../api/admin";
 import { useAdminStore } from "../../stores/admin";
 
 const admin = useAdminStore();
@@ -55,14 +56,19 @@ async function submitMessage() {
 
 const canDelete = computed(() => Boolean(admin.token));
 
-function saveToken() {
+async function saveToken() {
   if (!adminTokenInput.value.trim()) {
     ElMessage.warning("请输入管理员口令");
     return;
   }
   admin.setToken(adminTokenInput.value);
-  adminTokenInput.value = "";
-  ElMessage.success("口令已保存");
+  try {
+    await verifyAdminToken();
+    ElMessage.success("口令已保存");
+    adminTokenInput.value = "";
+  } catch {
+    // 拦截器已提示错误并自动清除口令，输入框保留供修改
+  }
 }
 
 async function removeMessage(message) {

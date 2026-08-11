@@ -86,6 +86,7 @@ npm run dev
 | `/api/messages` | GET | 留言列表（倒序） | 公开 |
 | `/api/messages` | POST | 发布留言 | 公开 |
 | `/api/messages/<id>` | DELETE | 删除留言（软删除） | 管理员 |
+| `/api/admin/verify` | POST | 校验管理员口令 | 管理员 |
 
 管理员接口需要请求头：`X-Admin-Token: <口令>`。
 

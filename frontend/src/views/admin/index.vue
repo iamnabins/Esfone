@@ -3,6 +3,7 @@ import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { createBook, deleteBook, getBooks } from "../../api/books";
+import { verifyAdminToken } from "../../api/admin";
 import { useAdminStore } from "../../stores/admin";
 import defaultCover from "../../assets/default-cover.png";
 import { useThemeStore } from "../../stores/theme";
@@ -32,14 +33,19 @@ async function loadBooks() {
   }
 }
 
-function saveToken() {
+async function saveToken() {
   if (!adminTokenInput.value.trim()) {
     ElMessage.warning("请输入管理员口令");
     return;
   }
   admin.setToken(adminTokenInput.value);
-  adminTokenInput.value = "";
-  ElMessage.success("口令已保存");
+  try {
+    await verifyAdminToken();
+    ElMessage.success("口令已保存");
+    adminTokenInput.value = "";
+  } catch {
+    // 拦截器已提示错误并自动清除口令，输入框保留供修改
+  }
 }
 
 async function submitBook() {
