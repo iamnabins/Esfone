@@ -71,7 +71,7 @@ const navs = [
 
 .header-inner {
   width: 100%;
-  padding: 18px 24px;
+  padding: 18px 28px 18px 44px;
   min-height: 110px;
   display: flex;
   align-items: center;
@@ -160,7 +160,7 @@ main {
 @media (max-width: 720px) {
   .header-inner {
     min-height: 88px;
-    padding: 12px 14px;
+    padding: 12px 14px 12px 24px;
   }
 
   .brand {

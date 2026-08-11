@@ -58,7 +58,7 @@ function openBook(book) {
 .book-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-  gap: 20px;
+  gap: 28px;
 }
 
 .book-card {
