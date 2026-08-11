@@ -5,10 +5,12 @@ import { ElMessage, ElMessageBox } from "element-plus";
 import { addChapter, deleteBook, getBook } from "../../api/books";
 import { useAdminStore } from "../../stores/admin";
 import defaultCover from "../../assets/default-cover.png";
+import { useThemeStore } from "../../stores/theme";
 
 const route = useRoute();
 const router = useRouter();
 const admin = useAdminStore();
+const theme = useThemeStore();
 
 const bookId = Number(route.params.id);
 const book = ref(null);
@@ -97,7 +99,13 @@ function readChapter(chapter) {
       <template v-if="book">
         <div class="book-head">
           <div class="cover-wrap">
-            <img :src="book.cover || defaultCover" :alt="book.title" class="cover" />
+            <img
+              v-if="book.cover || !theme.dark"
+              :src="book.cover || defaultCover"
+              :alt="book.title"
+              class="cover"
+            />
+            <div v-else class="cover cover-fallback"></div>
           </div>
           <div class="book-meta">
             <h1 class="book-title">{{ book.title }}</h1>
@@ -169,6 +177,10 @@ function readChapter(chapter) {
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+.cover-fallback {
+  background: var(--cover-bg);
 }
 
 .book-meta {

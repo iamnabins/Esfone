@@ -3,8 +3,10 @@ import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { getBooks } from "../../api/books";
 import defaultCover from "../../assets/default-cover.png";
+import { useThemeStore } from "../../stores/theme";
 
 const router = useRouter();
+const theme = useThemeStore();
 const books = ref([]);
 const loading = ref(true);
 
@@ -31,7 +33,14 @@ function openBook(book) {
     <div v-loading="loading" class="book-grid">
       <div v-for="book in books" :key="book.id" class="book-card" @click="openBook(book)">
         <div class="cover-wrap">
-          <img :src="book.cover || defaultCover" :alt="book.title" class="cover" loading="lazy" />
+          <img
+            v-if="book.cover || !theme.dark"
+            :src="book.cover || defaultCover"
+            :alt="book.title"
+            class="cover"
+            loading="lazy"
+          />
+          <div v-else class="cover cover-fallback"></div>
         </div>
         <div class="book-info">
           <p class="book-title">{{ book.title }}</p>
@@ -75,6 +84,10 @@ function openBook(book) {
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+.cover-fallback {
+  background: var(--cover-bg);
 }
 
 .book-info {

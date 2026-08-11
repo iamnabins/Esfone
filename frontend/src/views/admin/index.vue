@@ -5,8 +5,10 @@ import { ElMessage, ElMessageBox } from "element-plus";
 import { createBook, deleteBook, getBooks } from "../../api/books";
 import { useAdminStore } from "../../stores/admin";
 import defaultCover from "../../assets/default-cover.png";
+import { useThemeStore } from "../../stores/theme";
 
 const admin = useAdminStore();
+const theme = useThemeStore();
 const router = useRouter();
 
 const books = ref([]);
@@ -137,7 +139,13 @@ function formatTime(value) {
       <h2 class="form-title">书籍列表</h2>
       <el-empty v-if="!loading && books.length === 0" description="还没有书籍" :image-size="80" />
       <div v-for="book in books" :key="book.id" class="book-row">
-        <img :src="book.cover || defaultCover" :alt="book.title" class="thumb" />
+        <img
+          v-if="book.cover || !theme.dark"
+          :src="book.cover || defaultCover"
+          :alt="book.title"
+          class="thumb"
+        />
+        <div v-else class="thumb thumb-fallback"></div>
         <div class="book-main">
           <p class="book-title">{{ book.title }}</p>
           <p class="book-sub">作者：{{ book.author }} · 共 {{ book.chapter_count }} 章</p>
@@ -196,6 +204,10 @@ function formatTime(value) {
   aspect-ratio: 3 / 4;
   object-fit: cover;
   border-radius: 6px;
+  background: var(--cover-bg);
+}
+
+.thumb-fallback {
   background: var(--cover-bg);
 }
 
