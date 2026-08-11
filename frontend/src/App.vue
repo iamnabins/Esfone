@@ -10,6 +10,7 @@ const theme = useThemeStore();
 const searchKeyword = ref("");
 const searchOpen = ref(false);
 const searchInputRef = ref(null);
+const announcementVisible = ref(false);
 
 const navs = [
   { name: "home", label: "首页", path: "/" },
@@ -48,6 +49,13 @@ async function toggleSearch() {
           >
             {{ item.label }}
           </router-link>
+          <button
+            class="nav-link nav-btn"
+            :class="{ active: announcementVisible }"
+            @click="announcementVisible = true"
+          >
+            公告
+          </button>
         </nav>
         <div class="header-right">
           <div class="search-box" :class="{ open: searchOpen }">
@@ -96,6 +104,22 @@ async function toggleSearch() {
     <footer class="site-footer">
       <p>© 2026 Esfone · Made with ❤</p>
     </footer>
+
+    <el-dialog
+      v-model="announcementVisible"
+      title="公告"
+      width="min(520px, 92vw)"
+      align-center
+      class="announcement-dialog"
+    >
+      <div class="announcement-body">
+        <p>欢迎来到 Esfone！</p>
+        <p>这里是一个个人小说站：你可以自由浏览书籍、在线阅读，也可以在留言板写下想说的话。</p>
+        <p>网站由站长个人维护，目前仍在持续完善中，后续会陆续带来更多书籍和功能。</p>
+        <p>如果遇到问题或有任何建议，欢迎到留言板告诉我们。</p>
+        <p style="margin-top: 16px; color: var(--text-light)">—— Esfone 敬上</p>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -162,6 +186,14 @@ async function toggleSearch() {
   color: #fff;
   background: rgba(255, 255, 255, 0.2);
   font-weight: 600;
+}
+
+.nav-anchor .nav-btn {
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  cursor: pointer;
+  line-height: 1.4;
 }
 
 .header-right {

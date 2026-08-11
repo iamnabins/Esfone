@@ -70,6 +70,24 @@ a {
   color: var(--text-light);
 }
 
+.announcement-dialog {
+  border-radius: 14px;
+}
+
+.announcement-body {
+  line-height: 1.9;
+  color: var(--text);
+  font-size: 15px;
+}
+
+.announcement-body p {
+  margin: 0 0 12px;
+}
+
+.announcement-body p:last-child {
+  margin-bottom: 0;
+}
+
 /* 主题切换时的全局渐变动画（仅切换瞬间生效，避免影响普通 hover 动画） */
 html.theme-transition *,
 html.theme-transition *::before,
