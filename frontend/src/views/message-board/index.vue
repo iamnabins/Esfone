@@ -269,7 +269,8 @@ function formatTime(value) {
 }
 
 .toggle-btn {
-  margin-top: 6px;
+  display: block;
+  margin: 6px 0 0 auto;
   padding: 0;
 }
 </style>
