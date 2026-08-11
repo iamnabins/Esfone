@@ -122,7 +122,18 @@ async function handleLogout() {
               </el-button>
             </div>
           </el-popover>
-          <el-button v-else class="auth-btn" @click="router.push('/auth')">登录 / 注册</el-button>
+          <el-button
+            v-else
+            class="user-toggle"
+            circle
+            title="登录 / 注册"
+            aria-label="登录 / 注册"
+            @click="router.push('/auth')"
+          >
+            <el-icon :size="18">
+              <User />
+            </el-icon>
+          </el-button>
           <el-button
             class="theme-toggle"
             circle
@@ -293,19 +304,6 @@ async function handleLogout() {
   color: #fff;
 }
 
-.auth-btn {
-  height: 40px;
-  padding: 0 14px;
-  background: rgba(255, 255, 255, 0.12);
-  border-color: transparent;
-  color: #fff;
-}
-
-.auth-btn:hover {
-  background: rgba(255, 255, 255, 0.24);
-  color: #fff;
-}
-
 .user-toggle {
   width: 44px;
   height: 44px;
@@ -416,10 +414,5 @@ main {
     height: 38px;
   }
 
-  .auth-btn {
-    height: 36px;
-    padding: 0 10px;
-    font-size: 14px;
-  }
 }
 </style>
