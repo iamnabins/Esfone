@@ -2,6 +2,7 @@
 import { onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
+import Cropper from "cropperjs";
 import { submitSubmission } from "../../api/submissions";
 import { useAuthStore } from "../../stores/auth";
 import { supabase } from "../../lib/supabase";
@@ -17,6 +18,10 @@ const parseHint = ref("");
 const expectedChapters = ref(null);
 const coverUrl = ref("");
 const coverUploading = ref(false);
+const cropDialogVisible = ref(false);
+const cropImageUrl = ref("");
+const cropImgRef = ref(null);
+let cropper = null;
 const submitting = ref(false);
 const submitted = ref(false);
 
@@ -196,62 +201,16 @@ async function onCoverPick(options) {
     ElMessage.warning("封面图不能超过 20MB");
     return;
   }
-  coverUploading.value = true;
-  try {
-    let uploadFile = file;
-    let compressed = false;
-    let sizeKB = Math.round(file.size / 1024);
-    if (file.size > 500 * 1024) {
-      uploadFile = await compressImage(file);
-      compressed = true;
-      sizeKB = Math.round(uploadFile.size / 1024);
-    }
-    const ext = compressed
-      ? ".jpg"
-      : (file.name.match(/\.\w+$/) || [""])[0].toLowerCase();
-    const path = `covers/${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
-    const { error } = await supabase.storage
-      .from("covers")
-      .upload(path, uploadFile, {
-        contentType: uploadFile.type || "image/jpeg",
-      });
-    if (error) throw new Error(error.message);
-    coverUrl.value = supabase.storage.from("covers").getPublicUrl(path).data.publicUrl;
-    ElMessage.success(
-      compressed ? `封面上传成功（已压缩至 ${sizeKB} KB）` : "封面上传成功"
-    );
-  } catch (e) {
-    ElMessage.error("封面上传失败：" + (e.message || "请重试"));
-  } finally {
-    coverUploading.value = false;
+  cropImageUrl.value = URL.createObjectURL(file);
+  cropDialogVisible.value = true;
+}
+
+// 裁剪弹窗打开、DOM 挂载完成后初始化裁剪器
+watch(cropDialogVisible, (visible) => {
+  if (visible) {
+    requestAnimationFrame(() => initCropper());
   }
-}
-
-function loadImage(file) {
-  return new Promise((resolve, reject) => {
-    if (typeof createImageBitmap === "function") {
-      createImageBitmap(file)
-        .then(resolve)
-        .catch(() => loadViaImage(file, resolve, reject));
-    } else {
-      loadViaImage(file, resolve, reject);
-    }
-  });
-}
-
-function loadViaImage(file, resolve, reject) {
-  const url = URL.createObjectURL(file);
-  const img = new Image();
-  img.onload = () => {
-    URL.revokeObjectURL(url);
-    resolve(img);
-  };
-  img.onerror = () => {
-    URL.revokeObjectURL(url);
-    reject(new Error("图片加载失败"));
-  };
-  img.src = url;
-}
+});
 
 function drawToCanvas(img, maxSide) {
   const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
@@ -273,13 +232,12 @@ function canvasToBlob(canvas, quality) {
   });
 }
 
-/** 把图片压缩到 500KB 以内：逐级缩小尺寸、逐步降低质量 */
-async function compressImage(file) {
-  const img = await loadImage(file);
+/** 把裁剪后的画布压缩到 500KB 以内：逐级缩小尺寸、逐步降低质量 */
+async function compressCanvas(source) {
   const maxBytes = 500 * 1024;
-  const sizes = [900, 700, 500, 360, 280];
+  const sizes = [1200, 960, 760, 560, 400, 300];
   for (const maxSide of sizes) {
-    const canvas = drawToCanvas(img, maxSide);
+    const canvas = drawToCanvas(source, maxSide);
     let quality = 0.85;
     while (quality >= 0.3) {
       const blob = await canvasToBlob(canvas, quality);
@@ -287,8 +245,65 @@ async function compressImage(file) {
       quality -= 0.1;
     }
   }
-  const canvas = drawToCanvas(img, 240);
-  return (await canvasToBlob(canvas, 0.5)) || file;
+  return await canvasToBlob(drawToCanvas(source, 240), 0.5);
+}
+
+function initCropper() {
+  destroyCropper();
+  const img = cropImgRef.value;
+  if (!img) return;
+  const start = () => {
+    cropper = new Cropper(img, {
+      aspectRatio: 3 / 4,
+      viewMode: 1,
+      dragMode: "move",
+      autoCropArea: 1,
+      background: false,
+      checkOrientation: true,
+    });
+  };
+  if (img.complete) {
+    start();
+  } else {
+    img.onload = start;
+  }
+}
+
+function destroyCropper() {
+  if (cropper) {
+    cropper.destroy();
+    cropper = null;
+  }
+}
+
+function cancelCrop() {
+  cropDialogVisible.value = false;
+  destroyCropper();
+  if (cropImageUrl.value) URL.revokeObjectURL(cropImageUrl.value);
+  cropImageUrl.value = "";
+}
+
+async function confirmCrop() {
+  if (!cropper) return;
+  coverUploading.value = true;
+  try {
+    const source = cropper.getCroppedCanvas({ maxWidth: 900, maxHeight: 1200 });
+    const blob = await compressCanvas(source);
+    if (!blob) throw new Error("图片压缩失败");
+    const path = `covers/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
+    const { error } = await supabase.storage
+      .from("covers")
+      .upload(path, blob, { contentType: "image/jpeg" });
+    if (error) throw new Error(error.message);
+    coverUrl.value = supabase.storage.from("covers").getPublicUrl(path).data.publicUrl;
+    const sizeKB = Math.round(blob.size / 1024);
+    ElMessage.success(`封面上传成功（已裁剪为 3:4，${sizeKB} KB）`);
+    cancelCrop();
+  } catch (e) {
+    ElMessage.error("封面上传失败：" + (e.message || "请重试"));
+  } finally {
+    coverUploading.value = false;
+  }
 }
 
 function clearCover() {
@@ -383,7 +398,7 @@ function resetAll() {
                   <el-button :loading="coverUploading">选择图片</el-button>
                 </el-upload>
                 <el-button v-if="coverUrl" link type="danger" @click="clearCover">移除</el-button>
-                <span class="cover-tip">支持 jpg / png / webp，上传后自动压缩到 500KB 以内</span>
+                <span class="cover-tip">支持 jpg / png / webp，自动按 3:4 裁剪并压缩到 500KB 以内</span>
               </div>
             </div>
           </el-form-item>
@@ -435,6 +450,25 @@ function resetAll() {
           </el-form-item>
       </el-form>
     </div>
+
+    <el-dialog
+      v-model="cropDialogVisible"
+      title="裁剪封面（3:4）"
+      width="min(560px, 92vw)"
+      align-center
+      :close-on-click-modal="false"
+      @closed="cancelCrop"
+    >
+      <div class="crop-wrap">
+        <img ref="cropImgRef" :src="cropImageUrl" alt="待裁剪封面" class="crop-image" />
+      </div>
+      <template #footer>
+        <el-button :disabled="coverUploading" @click="cancelCrop">取消</el-button>
+        <el-button type="primary" :loading="coverUploading" @click="confirmCrop">
+          确定裁剪
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -490,6 +524,18 @@ function resetAll() {
 .cover-tip {
   color: var(--text-light);
   font-size: 12px;
+}
+
+.crop-wrap {
+  max-height: 62vh;
+  display: flex;
+  justify-content: center;
+}
+
+.crop-image {
+  display: block;
+  max-width: 100%;
+  max-height: 62vh;
 }
 
 .parse-hint {
