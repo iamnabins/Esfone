@@ -2,6 +2,8 @@
 
 一款前后端分离的个人小说网站：支持书籍管理、在线阅读、公共留言板，以及基于 Supabase 的注册登录。整体风格参考 ESJ Zone，追求简洁、清晰、易用。
 
+线上地址：https://esfone-novel.netlify.app
+
 ## 技术栈
 
 | 端 | 技术 |
@@ -171,6 +173,8 @@ VITE_SUPABASE_ANON_KEY=eyJ...
 1. 将仓库推送到 GitHub，并在 Netlify 中新建站点（连接仓库）。
 2. 构建命令：`npm run build`；发布目录：`dist`（`netlify.toml` 已配置）。
 3. 环境变量：`VITE_API_BASE=https://你的后端地址`，以及 `VITE_SUPABASE_URL`、`VITE_SUPABASE_ANON_KEY`；设置后重新构建。
+
+本站已连接 GitHub `main` 分支（构建目录 `frontend`），通过 GitHub Webhook 自动触发部署：推送 `main` 即自动构建上线；环境变量在 Netlify 站点配置中维护。
 
 ### 后端：Supabase Edge Functions
 
