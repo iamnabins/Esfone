@@ -103,7 +103,7 @@ npm run dev
 
 **管理员**
 
-- 进入「管理后台」，输入管理员口令（本地预览默认 `admin123`）并保存；口令正确才会开启管理功能
+- 进入「管理后台」，输入管理员口令（见 `backend/.env` 中的 `ADMIN_TOKEN`）并保存；口令正确才会开启管理功能
 - 管理后台：添加/删除书籍
 - 书籍详情页底部：添加章节、删除本书
 - 留言板：删除不当留言
@@ -203,7 +203,7 @@ VITE_SUPABASE_ANON_KEY=eyJ...
 ## 常见问题
 
 **管理员口令是什么？**
-本地开发在 `backend/.env` 的 `ADMIN_TOKEN` 中设置（本地预览示例为 `admin123`）；生产环境在云函数密钥（Secrets）中设置。
+本地开发在 `backend/.env` 的 `ADMIN_TOKEN` 中设置；生产环境在云函数密钥（Secrets）中设置。
 
 **怎么把数据库换成 Supabase？**
 在 `backend/.env` 设置 `DATABASE_URL` 指向 Supabase PostgreSQL，并按上文配置 `SUPABASE_*` 变量。
