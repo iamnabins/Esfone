@@ -5,6 +5,7 @@ import { useRoute } from "vue-router";
 import { getBooks } from "../../api/books";
 import defaultCover from "../../assets/default-cover.png";
 import { useThemeStore } from "../../stores/theme";
+import ThumbIcon from "../../components/ThumbIcon.vue";
 
 const router = useRouter();
 const route = useRoute();
@@ -63,6 +64,10 @@ function openBook(book) {
           <p class="book-title">{{ book.title }}</p>
           <p class="book-latest">最新章节：{{ book.latest_chapter || "暂无" }}</p>
           <p class="book-author">{{ book.author }}</p>
+          <p class="book-likes">
+            <ThumbIcon />
+            <span>{{ book.likes || 0 }}</span>
+          </p>
         </div>
       </div>
     </div>
@@ -139,6 +144,15 @@ function openBook(book) {
 .book-author {
   margin: 0;
   font-size: 13px;
+  color: var(--text-light);
+}
+
+.book-likes {
+  margin: 6px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
   color: var(--text-light);
 }
 </style>

@@ -5,6 +5,7 @@ import { ElMessage } from "element-plus";
 import { Moon, Search, Sunny, User } from "@element-plus/icons-vue";
 import { useThemeStore } from "./stores/theme";
 import { useAuthStore } from "./stores/auth";
+import { getFavorites } from "./api/books";
 
 const route = useRoute();
 const router = useRouter();
@@ -15,6 +16,9 @@ const searchOpen = ref(false);
 const searchInputRef = ref(null);
 const announcementVisible = ref(false);
 const loginDialogVisible = ref(false);
+const favoritesVisible = ref(false);
+const favoritesList = ref([]);
+const favoritesLoading = ref(false);
 
 const navs = computed(() => [
   { name: "home", label: "首页", path: "/" },
@@ -62,6 +66,24 @@ function openSubmit() {
 function goLogin() {
   loginDialogVisible.value = false;
   router.push("/auth");
+}
+
+async function openFavorites() {
+  favoritesVisible.value = true;
+  favoritesLoading.value = true;
+  try {
+    const data = await getFavorites();
+    favoritesList.value = data.books || [];
+  } catch {
+    // 拦截器已提示
+  } finally {
+    favoritesLoading.value = false;
+  }
+}
+
+function goFavorite(book) {
+  favoritesVisible.value = false;
+  router.push(`/book/${book.id}`);
 }
 </script>
 
@@ -138,6 +160,9 @@ function goLogin() {
               <p class="user-nickname">{{ auth.nickname || "未设置昵称" }}</p>
               <p class="user-email">{{ auth.user?.email }}</p>
               <p class="user-meta">注册于 {{ formatCreatedAt(auth.user?.created_at) }}</p>
+              <el-button link type="primary" class="fav-entry" @click="openFavorites">
+                我的收藏
+              </el-button>
               <el-button type="danger" plain size="small" class="logout-btn" @click="handleLogout">
                 退出登录
               </el-button>
@@ -207,6 +232,25 @@ function goLogin() {
         <el-button @click="loginDialogVisible = false">取消</el-button>
         <el-button type="primary" @click="goLogin">去登录</el-button>
       </template>
+    </el-dialog>
+
+    <el-dialog
+      v-model="favoritesVisible"
+      title="我的收藏"
+      width="min(460px, 92vw)"
+      align-center
+    >
+      <div v-loading="favoritesLoading" class="fav-list">
+        <el-empty
+          v-if="!favoritesLoading && favoritesList.length === 0"
+          description="还没有收藏书籍"
+          :image-size="70"
+        />
+        <div v-for="b in favoritesList" :key="b.id" class="fav-item" @click="goFavorite(b)">
+          <p class="fav-title">{{ b.title }}</p>
+          <p class="fav-sub">{{ b.author }} · {{ b.chapter_count }} 章 · 点赞 {{ b.likes || 0 }}</p>
+        </div>
+      </div>
     </el-dialog>
     </div>
   </template>
@@ -454,5 +498,39 @@ main {
 .login-dialog-body {
   margin: 0;
   line-height: 1.9;
+}
+
+.fav-entry {
+  margin: 2px 0 8px;
+}
+
+.fav-list {
+  min-height: 120px;
+  max-height: 55vh;
+  overflow-y: auto;
+}
+
+.fav-item {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.fav-item:hover {
+  background: var(--hover-bg);
+}
+
+.fav-title {
+  margin: 0 0 4px;
+  font-weight: 600;
+}
+
+.fav-sub {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-light);
 }
 </style>

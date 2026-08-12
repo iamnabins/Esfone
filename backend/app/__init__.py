@@ -12,6 +12,7 @@ from .routes import (
     auth_bp,
     books_bp,
     chapters_bp,
+    favorites_bp,
     messages_bp,
     submissions_bp,
 )
@@ -31,6 +32,7 @@ def create_app():
     app.register_blueprint(auth_bp)
     app.register_blueprint(books_bp)
     app.register_blueprint(chapters_bp)
+    app.register_blueprint(favorites_bp)
     app.register_blueprint(messages_bp)
     app.register_blueprint(submissions_bp)
 

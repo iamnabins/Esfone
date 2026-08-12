@@ -71,6 +71,7 @@ def create_submission():
         author=author,
         description=description,
         cover=(data.get("cover") or "").strip(),
+        intro=(data.get("intro") or "").strip(),
         user_id=user["id"],
         nickname=user["nickname"],
         chapters=chapters,
@@ -167,6 +168,7 @@ def approve_submission(sub_id):
         author=sub.author,
         cover=sub.cover or "",
         description=sub.description or "",
+        intro=sub.intro or "",
     )
     db.session.add(book)
     db.session.flush()

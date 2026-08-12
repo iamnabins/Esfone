@@ -13,9 +13,11 @@ const auth = useAuthStore();
 const form = ref({ title: "", author: "", description: "" });
 const fullText = ref("");
 const parsedChapters = ref([]);
+const parsedIntro = ref("");
 const parseMethodLabel = ref("");
 const parseHint = ref("");
 const expectedChapters = ref(null);
+const customSep = ref("");
 const coverUrl = ref("");
 const coverUploading = ref(false);
 const cropDialogVisible = ref(false);
@@ -77,6 +79,7 @@ const PARSERS = [
 function splitByHeadings(text, re, titleOf) {
   const lines = text.split(/\r?\n/);
   const list = [];
+  const introLines = [];
   let current = null;
   for (const raw of lines) {
     const line = raw.trimEnd();
@@ -86,15 +89,20 @@ function splitByHeadings(text, re, titleOf) {
       current = { title: titleOf(line, m) || `第${list.length + 1}章`, lines: [] };
     } else if (current) {
       current.lines.push(line);
+    } else {
+      // 第一个标题出现之前的文字作为开篇引言
+      introLines.push(line);
     }
   }
   if (current) list.push(current);
   if (list.length === 0 && text.trim()) {
     list.push({ title: "第一章", lines: text.trim().split(/\r?\n/) });
+    introLines.length = 0; // 整段作为一章时不再有引言
   }
-  return list
+  const chapters = list
     .map((c) => ({ title: c.title.trim(), content: c.lines.join("\n").trim() }))
     .filter((c) => c.title && c.content);
+  return { intro: introLines.join("\n").trim(), chapters };
 }
 
 function parseBySeparator(text) {
@@ -123,7 +131,32 @@ function parseBySeparator(text) {
     const content = lines.slice(first + 1).join("\n").trim();
     if (title && content) result.push({ title, content });
   });
-  return result;
+  return { intro: "", chapters: result };
+}
+
+function parseByCustom(text, regex) {
+  const lines = text.split(/\r?\n/);
+  const list = [];
+  const introLines = [];
+  let current = null;
+  for (const raw of lines) {
+    const line = raw.trimEnd();
+    const m = line.match(regex);
+    if (m) {
+      if (current) list.push(current);
+      const title = (m[1] ?? line).trim() || `第${list.length + 1}章`;
+      current = { title, lines: [] };
+    } else if (current) {
+      current.lines.push(line);
+    } else {
+      introLines.push(line);
+    }
+  }
+  if (current) list.push(current);
+  const chapters = list
+    .map((c) => ({ title: c.title.trim(), content: c.lines.join("\n").trim() }))
+    .filter((c) => c.title && c.content);
+  return { intro: introLines.join("\n").trim(), chapters };
 }
 
 function doParse() {
@@ -133,10 +166,29 @@ function doParse() {
     return;
   }
   const expected = expectedChapters.value ? Number(expectedChapters.value) : null;
-  const candidates = PARSERS.map((p) => ({
-    label: p.label,
-    chapters: p.parse(text),
-  })).filter((c) => c.chapters.length > 0);
+  let parserList = PARSERS;
+  const custom = customSep.value.trim();
+  if (custom) {
+    let re;
+    try {
+      re = new RegExp(custom);
+    } catch {
+      parsedChapters.value = [];
+      parseMethodLabel.value = "";
+      parseHint.value = "自定义分隔符不是有效的正则表达式";
+      return;
+    }
+    parserList = [
+      { label: `自定义分隔符（${custom}）`, parse: (t) => parseByCustom(t, re) },
+      ...PARSERS,
+    ];
+  }
+  const candidates = parserList
+    .map((p) => {
+      const r = p.parse(text);
+      return { label: p.label, intro: r.intro, chapters: r.chapters };
+    })
+    .filter((c) => c.chapters.length > 0);
 
   let chosen = null;
   if (expected && candidates.length) {
@@ -151,10 +203,18 @@ function doParse() {
   }
 
   if (!chosen) {
-    parsedChapters.value = [];
-    parseMethodLabel.value = "";
-    parseHint.value = "未能识别到章节内容，请检查文本格式";
-    return;
+    if (text.trim()) {
+      chosen = {
+        label: "整段作为一章",
+        intro: "",
+        chapters: [{ title: "第一章", content: text.trim() }],
+      };
+    } else {
+      parsedChapters.value = [];
+      parseMethodLabel.value = "";
+      parseHint.value = "未能识别到章节内容，请检查文本格式";
+      return;
+    }
   }
   if (chosen.chapters.length > MAX_CHAPTERS) {
     parsedChapters.value = [];
@@ -170,6 +230,7 @@ function doParse() {
     return;
   }
   parsedChapters.value = chosen.chapters;
+  parsedIntro.value = chosen.intro || "";
   parseMethodLabel.value = chosen.label;
   parseHint.value = "";
   const closest = expected ? "（与填写章节数最接近）" : "";
@@ -326,6 +387,7 @@ async function submit() {
       author: form.value.author.trim(),
       description: form.value.description.trim(),
       cover: coverUrl.value,
+      intro: parsedIntro.value,
       chapters: parsedChapters.value,
     });
     submitted.value = true;
@@ -340,9 +402,11 @@ function resetAll() {
   form.value = { title: "", author: "", description: "" };
   fullText.value = "";
   parsedChapters.value = [];
+  parsedIntro.value = "";
   parseMethodLabel.value = "";
   parseHint.value = "";
   expectedChapters.value = null;
+  customSep.value = "";
   coverUrl.value = "";
   submitted.value = false;
 }
@@ -422,6 +486,14 @@ function resetAll() {
             <el-input-number v-model="expectedChapters" :min="1" :max="10000" />
             <span class="field-hint">选填。本书一共有多少章？填上后会自动选择章节数最接近的解析方式</span>
           </el-form-item>
+          <el-form-item label="自定义分隔符">
+            <el-input
+              v-model="customSep"
+              placeholder="选填，正则表达式，如 ^第.+?章$"
+              class="field"
+            />
+            <span class="field-hint">匹配到该模式的行会作为新章节开头（支持正则）</span>
+          </el-form-item>
 
           <el-form-item>
             <el-button type="primary" @click="doParse">解析章节</el-button>
@@ -430,6 +502,10 @@ function resetAll() {
           <div v-if="parseHint" class="parse-hint">{{ parseHint }}</div>
 
           <div v-if="parsedChapters.length" class="parse-preview">
+            <div v-if="parsedIntro" class="intro-preview">
+              <p class="intro-label">开篇引言</p>
+              <p class="intro-text">{{ parsedIntro }}</p>
+            </div>
             <p class="parse-count">
               共识别到 <strong>{{ parsedChapters.length }}</strong> 章
             </p>
@@ -549,6 +625,32 @@ function resetAll() {
   padding: 14px 16px;
   margin-bottom: 18px;
   background: var(--card-bg);
+}
+
+.intro-preview {
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  background: var(--hover-bg);
+}
+
+.intro-label {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.intro-text {
+  margin: 0;
+  max-height: 120px;
+  overflow-y: auto;
+  font-size: 13px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-light);
 }
 
 .parse-count {

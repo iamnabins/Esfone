@@ -18,6 +18,8 @@ class Book(db.Model):
     author = db.Column(db.String(100), nullable=False)
     cover = db.Column(db.String(500), default="")
     description = db.Column(db.Text, default="")
+    intro = db.Column(db.Text, default="")
+    likes = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=utcnow)
 
     chapters = db.relationship(
@@ -36,6 +38,7 @@ class Book(db.Model):
             "description": self.description or "",
             "chapter_count": len(self.chapters),
             "latest_chapter": self.chapters[-1].title if self.chapters else None,
+            "likes": self.likes or 0,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
 

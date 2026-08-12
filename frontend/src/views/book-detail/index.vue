@@ -2,20 +2,36 @@
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { addChapter, deleteBook, getBook } from "../../api/books";
+import { Star } from "@element-plus/icons-vue";
+import {
+  addChapter,
+  deleteBook,
+  favoriteBook,
+  getBook,
+  likeBook,
+  unfavoriteBook,
+  unlikeBook,
+} from "../../api/books";
 import { verifyAdminToken } from "../../api/admin";
 import { useAdminStore } from "../../stores/admin";
+import { useAuthStore } from "../../stores/auth";
 import defaultCover from "../../assets/default-cover.png";
 import { useThemeStore } from "../../stores/theme";
+import ThumbIcon from "../../components/ThumbIcon.vue";
 
 const route = useRoute();
 const router = useRouter();
 const admin = useAdminStore();
 const theme = useThemeStore();
+const auth = useAuthStore();
 
 const bookId = Number(route.params.id);
 const book = ref(null);
 const loading = ref(true);
+const liked = ref(false);
+const favorited = ref(false);
+const likesCount = ref(0);
+const actionBusy = ref(false);
 
 const chapterTitle = ref("");
 const chapterContent = ref("");
@@ -29,10 +45,61 @@ async function loadBook() {
   try {
     const data = await getBook(bookId);
     book.value = data.book;
+    liked.value = Boolean(data.book.liked);
+    favorited.value = Boolean(data.book.favorited);
+    likesCount.value = data.book.likes || 0;
   } catch {
     book.value = null;
   } finally {
     loading.value = false;
+  }
+}
+
+async function toggleLike() {
+  if (!auth.isLoggedIn) {
+    ElMessage.warning("请先登录后再点赞");
+    return;
+  }
+  if (actionBusy.value) return;
+  actionBusy.value = true;
+  try {
+    if (liked.value) {
+      const data = await unlikeBook(bookId);
+      liked.value = false;
+      likesCount.value = data.likes || 0;
+    } else {
+      const data = await likeBook(bookId);
+      liked.value = true;
+      likesCount.value = data.likes || 0;
+    }
+  } catch {
+    // 拦截器已提示
+  } finally {
+    actionBusy.value = false;
+  }
+}
+
+async function toggleFavorite() {
+  if (!auth.isLoggedIn) {
+    ElMessage.warning("请先登录后再收藏");
+    return;
+  }
+  if (actionBusy.value) return;
+  actionBusy.value = true;
+  try {
+    if (favorited.value) {
+      await unfavoriteBook(bookId);
+      favorited.value = false;
+      ElMessage.success("已取消收藏");
+    } else {
+      await favoriteBook(bookId);
+      favorited.value = true;
+      ElMessage.success("收藏成功");
+    }
+  } catch {
+    // 拦截器已提示
+  } finally {
+    actionBusy.value = false;
   }
 }
 
@@ -118,11 +185,34 @@ function readChapter(chapter) {
             <p class="book-author">作者：{{ book.author }}</p>
             <p v-if="book.description" class="book-desc">{{ book.description }}</p>
             <div class="book-actions">
+              <el-button
+                size="small"
+                :class="{ active: liked }"
+                :icon="ThumbIcon"
+                :loading="actionBusy"
+                @click="toggleLike"
+              >
+                点赞 {{ likesCount }}
+              </el-button>
+              <el-button
+                size="small"
+                :class="{ active: favorited }"
+                :icon="Star"
+                :loading="actionBusy"
+                @click="toggleFavorite"
+              >
+                {{ favorited ? "已收藏" : "收藏" }}
+              </el-button>
               <el-button v-if="isAdminReady" type="danger" plain size="small" @click="removeBook">
                 删除本书
               </el-button>
             </div>
           </div>
+        </div>
+
+        <div v-if="book.intro" class="book-intro">
+          <p class="intro-label">引言</p>
+          <p class="intro-text">{{ book.intro }}</p>
         </div>
 
         <el-divider content-position="left">章节列表（共 {{ book.chapters.length }} 章）</el-divider>
@@ -213,6 +303,38 @@ function readChapter(chapter) {
 
 .book-actions {
   margin-top: 8px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.book-actions .el-button.active {
+  color: var(--primary);
+  border-color: var(--primary);
+  background: var(--primary-light, rgba(91, 77, 191, 0.1));
+}
+
+.book-intro {
+  margin-top: 20px;
+  padding: 14px 18px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  background: var(--hover-bg);
+}
+
+.intro-label {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.intro-text {
+  margin: 0;
+  line-height: 1.9;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-light);
 }
 
 .chapter-list {

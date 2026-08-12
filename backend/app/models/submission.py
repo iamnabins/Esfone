@@ -12,6 +12,7 @@ class Submission(db.Model):
     author = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text, nullable=False)
     cover = db.Column(db.String(500), default="")
+    intro = db.Column(db.Text, default="")
     user_id = db.Column(db.String(100), default="")
     nickname = db.Column(db.String(100), default="")
     chapters = db.Column(db.JSON, default=list)

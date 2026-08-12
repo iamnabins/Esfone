@@ -108,6 +108,8 @@ type BookRow = {
   author: string;
   cover: string | null;
   description: string | null;
+  intro: string | null;
+  likes: number | null;
   created_at: string | null;
 };
 
@@ -148,6 +150,7 @@ async function buildBookSummaries(rows: BookRow[]): Promise<unknown[]> {
       description: b.description ?? "",
       chapter_count: chs.length,
       latest_chapter: latest ? latest.title : null,
+      likes: b.likes ?? 0,
       created_at: b.created_at,
     };
   });
@@ -254,9 +257,32 @@ Deno.serve(async (req) => {
 
       const books = await buildBookSummaries([book as BookRow]);
       const summary = books[0] as Record<string, unknown>;
+      const auth = await requireUser(req);
+      let liked = false;
+      let favorited = false;
+      if (auth.ok) {
+        const { data: likeRow } = await db
+          .from("book_likes")
+          .select("user_id")
+          .eq("book_id", id)
+          .eq("user_id", auth.user.id)
+          .maybeSingle();
+        const { data: favRow } = await db
+          .from("favorites")
+          .select("user_id")
+          .eq("book_id", id)
+          .eq("user_id", auth.user.id)
+          .maybeSingle();
+        liked = Boolean(likeRow);
+        favorited = Boolean(favRow);
+      }
       return json({
         book: {
           ...summary,
+          intro: book.intro ?? "",
+          likes: book.likes ?? 0,
+          liked,
+          favorited,
           chapters: chapters ?? [],
         },
       });
@@ -278,6 +304,122 @@ Deno.serve(async (req) => {
       if (error) return serverError(error);
       if (!data || !data.length) return json({ error: "书籍不存在" }, 404);
       return json({ ok: true });
+    } catch (e) {
+      return serverError(e);
+    }
+  }
+
+  const likeMatch = path.match(/^\/api\/books\/(\d+)\/like$/);
+  const favoriteMatch = path.match(/^\/api\/books\/(\d+)\/favorite$/);
+  const favoritesListMatch = path.match(/^\/api\/favorites\/?$/);
+
+  if (likeMatch && (req.method === "POST" || req.method === "DELETE")) {
+    const auth = await requireUser(req);
+    if (!auth.ok) return auth.response;
+    try {
+      const id = Number(likeMatch[1]);
+      const { data: book, error: bookErr } = await db
+        .from("books")
+        .select("id")
+        .eq("id", id)
+        .maybeSingle();
+      if (bookErr) return serverError(bookErr);
+      if (!book) return json({ error: "书籍不存在" }, 404);
+
+      if (req.method === "POST") {
+        const { error: upsErr } = await db
+          .from("book_likes")
+          .upsert(
+            {
+              user_id: auth.user.id,
+              book_id: id,
+              created_at: new Date().toISOString(),
+            },
+            { onConflict: "user_id,book_id", ignoreDuplicates: true },
+          );
+        if (upsErr) return serverError(upsErr);
+      } else {
+        const { error: delErr } = await db
+          .from("book_likes")
+          .delete()
+          .eq("book_id", id)
+          .eq("user_id", auth.user.id);
+        if (delErr) return serverError(delErr);
+      }
+
+      const { count } = await db
+        .from("book_likes")
+        .select("user_id", { count: "exact", head: true })
+        .eq("book_id", id);
+      await db.from("books").update({ likes: count }).eq("id", id);
+      return json({ ok: true, likes: count });
+    } catch (e) {
+      return serverError(e);
+    }
+  }
+
+  if (favoriteMatch && (req.method === "POST" || req.method === "DELETE")) {
+    const auth = await requireUser(req);
+    if (!auth.ok) return auth.response;
+    try {
+      const id = Number(favoriteMatch[1]);
+      const { data: book, error: bookErr } = await db
+        .from("books")
+        .select("id")
+        .eq("id", id)
+        .maybeSingle();
+      if (bookErr) return serverError(bookErr);
+      if (!book) return json({ error: "书籍不存在" }, 404);
+
+      if (req.method === "POST") {
+        const { error: upsErr } = await db
+          .from("favorites")
+          .upsert(
+            {
+              user_id: auth.user.id,
+              book_id: id,
+              created_at: new Date().toISOString(),
+            },
+            { onConflict: "user_id,book_id", ignoreDuplicates: true },
+          );
+        if (upsErr) return serverError(upsErr);
+      } else {
+        const { error: delErr } = await db
+          .from("favorites")
+          .delete()
+          .eq("book_id", id)
+          .eq("user_id", auth.user.id);
+        if (delErr) return serverError(delErr);
+      }
+      return json({ ok: true });
+    } catch (e) {
+      return serverError(e);
+    }
+  }
+
+  if (favoritesListMatch && req.method === "GET") {
+    const auth = await requireUser(req);
+    if (!auth.ok) return auth.response;
+    try {
+      const { data: rows, error: favErr } = await db
+        .from("favorites")
+        .select("book_id")
+        .eq("user_id", auth.user.id)
+        .order("created_at", { ascending: false })
+        .order("book_id", { ascending: false });
+      if (favErr) return serverError(favErr);
+      const ids = (rows ?? []).map((r) => (r as { book_id: number }).book_id);
+      if (!ids.length) return json({ books: [] });
+
+      const { data: booksData, error } = await db
+        .from("books")
+        .select("*")
+        .in("id", ids);
+      if (error) return serverError(error);
+      const books = await buildBookSummaries((booksData ?? []) as BookRow[]);
+      const byId = new Map(books.map((b) => [(b as { id: number }).id, b]));
+      const ordered = ids.map((i) => byId.get(i)).filter(Boolean);
+      return json({ books: ordered });
     } catch (e) {
       return serverError(e);
     }
@@ -409,8 +551,12 @@ Deno.serve(async (req) => {
       const title = String(data.title ?? "").trim();
       const author = String(data.author ?? "").trim();
       const description = String(data.description ?? "").trim();
+      const intro = String(data.intro ?? "").trim();
       if (!title || !author || !description) {
         return json({ error: "书名、作者和书籍简介不能为空" }, 400);
+      }
+      if (intro.length > 20000) {
+        return json({ error: "引言不能超过 20000 字" }, 400);
       }
 
       const rawChapters = Array.isArray(data.chapters) ? data.chapters : [];
@@ -448,6 +594,7 @@ Deno.serve(async (req) => {
           author,
           description,
           cover: String(data.cover ?? "").trim(),
+          intro,
           user_id: auth.user.id,
           nickname: auth.user.nickname,
           chapters,
@@ -560,6 +707,7 @@ Deno.serve(async (req) => {
           author: sub.author,
           cover: sub.cover ?? "",
           description: sub.description ?? "",
+          intro: sub.intro ?? "",
           created_at: new Date().toISOString(),
         })
         .select("id")
