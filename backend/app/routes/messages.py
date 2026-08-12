@@ -28,12 +28,14 @@ def _client_ip():
 
 @messages_bp.get("")
 def list_messages():
-    """获取所有未删除留言，按时间倒序（公开）。"""
-    messages = (
-        Message.query.filter_by(is_deleted=False)
-        .order_by(Message.created_at.desc(), Message.id.desc())
-        .all()
-    )
+    """获取未删除留言，按时间倒序（公开）。支持 ?category=forum|feedback。"""
+    category = (request.args.get("category") or "").strip()
+    if category and category not in ("forum", "feedback"):
+        return jsonify({"error": "留言分类不正确"}), 400
+    query = Message.query.filter_by(is_deleted=False)
+    if category:
+        query = query.filter_by(category=category)
+    messages = query.order_by(Message.created_at.desc(), Message.id.desc()).all()
     return jsonify({"messages": [m.to_dict() for m in messages]})
 
 
@@ -48,6 +50,9 @@ def create_message():
         return jsonify({"error": f"留言内容不能超过 {MAX_CONTENT_LENGTH} 字"}), 400
 
     nickname = (data.get("nickname") or "").strip()[:50]
+    category = (data.get("category") or "forum").strip()
+    if category not in ("forum", "feedback"):
+        return jsonify({"error": "留言分类不正确"}), 400
 
     ip = _client_ip()
     now = time.time()
@@ -55,7 +60,7 @@ def create_message():
         return jsonify({"error": "发布过于频繁，请稍后再试"}), 429
     _last_post_at[ip] = now
 
-    message = Message(nickname=nickname, content=content, ip=ip)
+    message = Message(nickname=nickname, content=content, ip=ip, category=category)
     db.session.add(message)
     db.session.commit()
     return jsonify({"message": message.to_dict()}), 201

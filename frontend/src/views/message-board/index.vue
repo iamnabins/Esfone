@@ -8,6 +8,11 @@ import { useAdminStore } from "../../stores/admin";
 const admin = useAdminStore();
 const messages = ref([]);
 const loading = ref(true);
+const activeTab = ref("forum");
+const tabOptions = [
+  { label: "论坛", value: "forum" },
+  { label: "意见反馈", value: "feedback" },
+];
 
 const nickname = ref("");
 const content = ref("");
@@ -22,7 +27,7 @@ onMounted(loadMessages);
 async function loadMessages() {
   loading.value = true;
   try {
-    const data = await getMessages();
+    const data = await getMessages(activeTab.value);
     messages.value = data.messages || [];
     await nextTick();
     checkOverflow();
@@ -31,6 +36,12 @@ async function loadMessages() {
   } finally {
     loading.value = false;
   }
+}
+
+function onTabChange() {
+  expanded.value = {};
+  hasMore.value = {};
+  loadMessages();
 }
 
 function checkOverflow() {
@@ -62,8 +73,9 @@ async function submitMessage() {
     await createMessage({
       nickname: nickname.value.trim(),
       content: content.value.trim(),
+      category: activeTab.value,
     });
-    ElMessage.success("留言成功");
+    ElMessage.success(activeTab.value === "forum" ? "留言成功" : "反馈已提交");
     nickname.value = "";
     content.value = "";
     await loadMessages();
@@ -122,8 +134,12 @@ function formatTime(value) {
   <div class="page-container message-page">
     <h1 class="page-title">留言板</h1>
 
+    <div class="board-tabs">
+      <el-segmented v-model="activeTab" :options="tabOptions" @change="onTabChange" />
+    </div>
+
     <div class="card">
-      <h2 class="form-title">发表留言</h2>
+      <h2 class="form-title">{{ activeTab === "forum" ? "发表留言" : "提交反馈" }}</h2>
       <el-input v-model="nickname" placeholder="昵称（可选）" maxlength="50" class="field" />
       <el-input
         v-model="content"
@@ -131,10 +147,12 @@ function formatTime(value) {
         :rows="4"
         maxlength="500"
         show-word-limit
-        placeholder="想说的话（500 字以内）"
+        :placeholder="activeTab === 'forum' ? '想说的话（500 字以内）' : '写下你的意见或改进建议（500 字以内）'"
         class="field"
       />
-      <el-button type="primary" :loading="submitting" @click="submitMessage">发布留言</el-button>
+      <el-button type="primary" :loading="submitting" @click="submitMessage">
+        {{ activeTab === "forum" ? "发布留言" : "提交反馈" }}
+      </el-button>
 
       <el-divider />
 
@@ -156,7 +174,10 @@ function formatTime(value) {
     </div>
 
     <div v-loading="loading">
-      <el-empty v-if="!loading && messages.length === 0" description="还没有留言，来说点什么吧" />
+      <el-empty
+        v-if="!loading && messages.length === 0"
+        :description="activeTab === 'forum' ? '还没有留言，来说点什么吧' : '还没有反馈，欢迎提出建议'"
+      />
       <div v-for="message in messages" :key="message.id" class="card message-item">
         <div class="message-head">
           <span class="message-nickname">{{ message.nickname }}</span>
@@ -197,6 +218,10 @@ function formatTime(value) {
 <style scoped>
 .message-page {
   max-width: 760px;
+}
+
+.board-tabs {
+  margin-bottom: 16px;
 }
 
 .form-title {

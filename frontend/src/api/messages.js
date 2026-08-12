@@ -1,7 +1,7 @@
 import http from "./http";
 
-export function getMessages() {
-  return http.get("/api/messages");
+export function getMessages(category) {
+  return http.get("/api/messages", { params: category ? { category } : {} });
 }
 
 export function createMessage(data) {

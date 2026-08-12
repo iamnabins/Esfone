@@ -157,12 +157,14 @@ function messageToDict(m: {
   id: number;
   nickname: string | null;
   content: string;
+  category: string | null;
   created_at: string | null;
 }): unknown {
   return {
     id: m.id,
     nickname: (m.nickname ?? "").trim() || "匿名",
     content: m.content,
+    category: m.category ?? "forum",
     created_at: m.created_at,
   };
 }
@@ -627,10 +629,16 @@ Deno.serve(async (req) => {
   const messagesMatch = path.match(/^\/api\/messages\/?$/);
   if (messagesMatch && req.method === "GET") {
     try {
-      const { data, error } = await db
+      const category = (url.searchParams.get("category") ?? "").trim();
+      if (category && category !== "forum" && category !== "feedback") {
+        return json({ error: "留言分类不正确" }, 400);
+      }
+      let query = db
         .from("messages")
-        .select("id, nickname, content, created_at")
-        .eq("is_deleted", false)
+        .select("id, nickname, content, category, created_at")
+        .eq("is_deleted", false);
+      if (category) query = query.eq("category", category);
+      const { data, error } = await query
         .order("created_at", { ascending: false })
         .order("id", { ascending: false });
       if (error) return serverError(error);
@@ -653,6 +661,8 @@ Deno.serve(async (req) => {
       }
 
       const nickname = String(data.nickname ?? "").trim().slice(0, 50);
+      const categoryRaw = String(data.category ?? "").trim();
+      const category = categoryRaw === "feedback" ? "feedback" : "forum";
       const ip = clientIp(req);
       const now = Date.now() / 1000;
       if (ip && now - (lastPostAt.get(ip) ?? 0) < POST_COOLDOWN_SECONDS) {
@@ -667,9 +677,10 @@ Deno.serve(async (req) => {
           content,
           ip,
           is_deleted: false,
+          category,
           created_at: new Date().toISOString(),
         })
-        .select("id, nickname, content, created_at")
+        .select("id, nickname, content, category, created_at")
         .single();
       if (error) return serverError(error);
       return json({ message: messageToDict(message as never) }, 201);
