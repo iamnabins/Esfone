@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import { submitSubmission } from "../../api/submissions";
@@ -31,7 +31,13 @@ onMounted(async () => {
   }
 });
 
-const loggedIn = computed(() => auth.isLoggedIn);
+// 停留在投稿页时退出登录，自动跳回登录页
+watch(
+  () => auth.isLoggedIn,
+  (val) => {
+    if (!val) router.replace("/auth");
+  }
+);
 
 const PARSERS = [
   {
@@ -249,31 +255,24 @@ function resetAll() {
 
 <template>
   <div class="page-container">
-    <div v-if="!loggedIn" class="card">
-      <h1 class="page-title">投稿</h1>
-      <p class="guest-tip">投稿功能需要登录后使用。</p>
-      <el-button type="primary" @click="router.push('/auth')">去登录 / 注册</el-button>
+    <div v-if="submitted" class="card submit-success">
+      <el-result
+        icon="success"
+        title="投稿成功，等待管理员审核"
+        sub-title="审核通过后，你的作品会自动上架到书籍列表"
+      >
+        <template #extra>
+          <el-button type="primary" @click="resetAll">再投一篇</el-button>
+          <el-button @click="router.push('/')">返回首页</el-button>
+        </template>
+      </el-result>
     </div>
 
-    <template v-else>
-      <div v-if="submitted" class="card submit-success">
-        <el-result
-          icon="success"
-          title="投稿成功，等待管理员审核"
-          sub-title="审核通过后，你的作品会自动上架到书籍列表"
-        >
-          <template #extra>
-            <el-button type="primary" @click="resetAll">再投一篇</el-button>
-            <el-button @click="router.push('/')">返回首页</el-button>
-          </template>
-        </el-result>
-      </div>
+    <div v-else class="card">
+      <h1 class="page-title">投稿</h1>
+      <p class="page-sub">填写书籍信息并上传全文，审核通过后自动上架。</p>
 
-      <div v-else class="card">
-        <h1 class="page-title">投稿</h1>
-        <p class="page-sub">填写书籍信息并上传全文，审核通过后自动上架。</p>
-
-        <el-form label-width="90px" class="submit-form">
+      <el-form label-width="90px" class="submit-form">
           <el-form-item label="书名" required>
             <el-input v-model="form.title" placeholder="书名" maxlength="200" />
           </el-form-item>
@@ -353,9 +352,8 @@ function resetAll() {
               提交投稿
             </el-button>
           </el-form-item>
-        </el-form>
-      </div>
-    </template>
+      </el-form>
+    </div>
   </div>
 </template>
 

@@ -14,13 +14,11 @@ const searchKeyword = ref("");
 const searchOpen = ref(false);
 const searchInputRef = ref(null);
 const announcementVisible = ref(false);
+const loginDialogVisible = ref(false);
 
 const navs = computed(() => [
   { name: "home", label: "首页", path: "/" },
   { name: "message-board", label: "留言板", path: "/message-board" },
-  ...(auth.isLoggedIn
-    ? [{ name: "submit", label: "投稿", path: "/submit" }]
-    : []),
   { name: "admin", label: "管理后台", path: "/admin" },
 ]);
 
@@ -52,6 +50,19 @@ async function handleLogout() {
   await auth.signOut();
   ElMessage.success("已退出登录");
 }
+
+function openSubmit() {
+  if (auth.isLoggedIn) {
+    router.push("/submit");
+  } else {
+    loginDialogVisible.value = true;
+  }
+}
+
+function goLogin() {
+  loginDialogVisible.value = false;
+  router.push("/auth");
+}
 </script>
 
 <template>
@@ -71,6 +82,13 @@ async function handleLogout() {
           >
             {{ item.label }}
           </router-link>
+          <button
+            class="nav-link nav-btn"
+            :class="{ active: route.path === '/submit' }"
+            @click="openSubmit"
+          >
+            投稿
+          </button>
           <button
             class="nav-link nav-btn"
             :class="{ active: announcementVisible }"
@@ -174,10 +192,24 @@ async function handleLogout() {
         <p>网站由站长个人维护，目前仍在持续完善中，后续会陆续带来更多书籍和功能。</p>
         <p>如果遇到问题或有任何建议，欢迎到留言板告诉我们。</p>
         <p style="margin-top: 16px; color: var(--text-light)">—— Esfone 敬上</p>
-      </div>
+        </div>
     </el-dialog>
-  </div>
-</template>
+
+    <el-dialog
+      v-model="loginDialogVisible"
+      title="登录提示"
+      width="min(420px, 92vw)"
+      align-center
+      class="login-dialog"
+    >
+      <p class="login-dialog-body">投稿功能需要登录后使用，是否前往登录？</p>
+      <template #footer>
+        <el-button @click="loginDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="goLogin">去登录</el-button>
+      </template>
+    </el-dialog>
+    </div>
+  </template>
 
 <style scoped>
 .app-shell {
@@ -417,5 +449,10 @@ main {
     height: 38px;
   }
 
+}
+
+.login-dialog-body {
+  margin: 0;
+  line-height: 1.9;
 }
 </style>
