@@ -192,23 +192,103 @@ async function onCoverPick(options) {
     ElMessage.warning("请选择图片文件");
     return;
   }
-  if (file.size > 5 * 1024 * 1024) {
-    ElMessage.warning("封面图不能超过 5MB");
+  if (file.size > 20 * 1024 * 1024) {
+    ElMessage.warning("封面图不能超过 20MB");
     return;
   }
   coverUploading.value = true;
   try {
-    const ext = (file.name.match(/\.\w+$/) || [""])[0].toLowerCase();
+    let uploadFile = file;
+    let compressed = false;
+    let sizeKB = Math.round(file.size / 1024);
+    if (file.size > 500 * 1024) {
+      uploadFile = await compressImage(file);
+      compressed = true;
+      sizeKB = Math.round(uploadFile.size / 1024);
+    }
+    const ext = compressed
+      ? ".jpg"
+      : (file.name.match(/\.\w+$/) || [""])[0].toLowerCase();
     const path = `covers/${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
-    const { error } = await supabase.storage.from("covers").upload(path, file);
+    const { error } = await supabase.storage
+      .from("covers")
+      .upload(path, uploadFile, {
+        contentType: uploadFile.type || "image/jpeg",
+      });
     if (error) throw new Error(error.message);
     coverUrl.value = supabase.storage.from("covers").getPublicUrl(path).data.publicUrl;
-    ElMessage.success("封面上传成功");
+    ElMessage.success(
+      compressed ? `封面上传成功（已压缩至 ${sizeKB} KB）` : "封面上传成功"
+    );
   } catch (e) {
     ElMessage.error("封面上传失败：" + (e.message || "请重试"));
   } finally {
     coverUploading.value = false;
   }
+}
+
+function loadImage(file) {
+  return new Promise((resolve, reject) => {
+    if (typeof createImageBitmap === "function") {
+      createImageBitmap(file)
+        .then(resolve)
+        .catch(() => loadViaImage(file, resolve, reject));
+    } else {
+      loadViaImage(file, resolve, reject);
+    }
+  });
+}
+
+function loadViaImage(file, resolve, reject) {
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    URL.revokeObjectURL(url);
+    resolve(img);
+  };
+  img.onerror = () => {
+    URL.revokeObjectURL(url);
+    reject(new Error("图片加载失败"));
+  };
+  img.src = url;
+}
+
+function drawToCanvas(img, maxSide) {
+  const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+  const w = Math.max(1, Math.round(img.width * scale));
+  const h = Math.max(1, Math.round(img.height * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, w, h);
+  ctx.drawImage(img, 0, 0, w, h);
+  return canvas;
+}
+
+function canvasToBlob(canvas, quality) {
+  return new Promise((resolve) => {
+    canvas.toBlob(resolve, "image/jpeg", quality);
+  });
+}
+
+/** 把图片压缩到 500KB 以内：逐级缩小尺寸、逐步降低质量 */
+async function compressImage(file) {
+  const img = await loadImage(file);
+  const maxBytes = 500 * 1024;
+  const sizes = [900, 700, 500, 360, 280];
+  for (const maxSide of sizes) {
+    const canvas = drawToCanvas(img, maxSide);
+    let quality = 0.85;
+    while (quality >= 0.3) {
+      const blob = await canvasToBlob(canvas, quality);
+      if (blob && blob.size <= maxBytes) return blob;
+      quality -= 0.1;
+    }
+  }
+  const canvas = drawToCanvas(img, 240);
+  return (await canvasToBlob(canvas, 0.5)) || file;
 }
 
 function clearCover() {
@@ -303,6 +383,7 @@ function resetAll() {
                   <el-button :loading="coverUploading">选择图片</el-button>
                 </el-upload>
                 <el-button v-if="coverUrl" link type="danger" @click="clearCover">移除</el-button>
+                <span class="cover-tip">支持 jpg / png / webp，上传后自动压缩到 500KB 以内</span>
               </div>
             </div>
           </el-form-item>
@@ -404,6 +485,11 @@ function resetAll() {
   flex-direction: column;
   align-items: flex-start;
   gap: 8px;
+}
+
+.cover-tip {
+  color: var(--text-light);
+  font-size: 12px;
 }
 
 .parse-hint {
