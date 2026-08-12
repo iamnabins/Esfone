@@ -13,8 +13,14 @@ export const useAuthStore = defineStore("auth", {
   actions: {
     async init() {
       try {
-        const { data } = await supabase.auth.getSession();
-        this.user = data?.session?.user ?? null;
+        // 校验当前会话是否仍然有效（过期/失效的会话会返回错误，自动清除）
+        const { data, error } = await supabase.auth.getUser();
+        if (error) {
+          this.user = null;
+          await supabase.auth.signOut();
+        } else {
+          this.user = data?.user ?? null;
+        }
       } catch {
         this.user = null;
       }

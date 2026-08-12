@@ -12,7 +12,9 @@ const auth = useAuthStore();
 const form = ref({ title: "", author: "", description: "" });
 const fullText = ref("");
 const parsedChapters = ref([]);
+const parseMethodLabel = ref("");
 const parseHint = ref("");
+const expectedChapters = ref(null);
 const coverUrl = ref("");
 const coverUploading = ref(false);
 const submitting = ref(false);
@@ -21,27 +23,56 @@ const submitted = ref(false);
 const MAX_CHAPTERS = 500;
 const MAX_CHAPTER_CHARS = 100000;
 
-const HEADING_RE = /^\s*(第[0-9零一二三四五六七八九十百千万两]+[章节回卷篇])(.*)$/;
-const MARKDOWN_RE = /^\s*#\s+(.+)$/;
-
 onMounted(async () => {
   if (!auth.initialized) await auth.init();
+  if (!auth.isLoggedIn) {
+    router.replace("/auth");
+    return;
+  }
 });
 
 const loggedIn = computed(() => auth.isLoggedIn);
 
-function parseChapters(text) {
+const PARSERS = [
+  {
+    label: "章节词（第X章/回/节/卷/篇）",
+    parse: (text) =>
+      splitByHeadings(
+        text,
+        /^\s*(第[0-9零一二三四五六七八九十百千万两]+[章节回卷篇])(.*)$/,
+        (line) => line.trim()
+      ),
+  },
+  {
+    label: "Markdown 标题（#）",
+    parse: (text) =>
+      splitByHeadings(text, /^\s*#\s+(.+)$/, (_line, m) => m[1].trim()),
+  },
+  {
+    label: "章节词或 Markdown 标题",
+    parse: (text) =>
+      splitByHeadings(
+        text,
+        /^\s*(?:#\s+)?(第[0-9零一二三四五六七八九十百千万两]+[章节回卷篇])(.*)$/,
+        (line) => line.trim()
+      ),
+  },
+  {
+    label: "分隔线（--- / ===）",
+    parse: parseBySeparator,
+  },
+];
+
+function splitByHeadings(text, re, titleOf) {
   const lines = text.split(/\r?\n/);
   const list = [];
   let current = null;
   for (const raw of lines) {
     const line = raw.trimEnd();
-    const head = line.match(HEADING_RE);
-    const md = line.match(MARKDOWN_RE);
-    if (head || md) {
+    const m = line.match(re);
+    if (m) {
       if (current) list.push(current);
-      const title = head ? line.trim() : md ? md[1].trim() : "";
-      current = { title: title || `第${list.length + 1}章`, lines: [] };
+      current = { title: titleOf(line, m) || `第${list.length + 1}章`, lines: [] };
     } else if (current) {
       current.lines.push(line);
     }
@@ -55,32 +86,83 @@ function parseChapters(text) {
     .filter((c) => c.title && c.content);
 }
 
+function parseBySeparator(text) {
+  const SEP_RE = /^\s*(?:-{3,}|={3,})\s*$/;
+  const blocks = [];
+  let current = [];
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trimEnd();
+    if (SEP_RE.test(line)) {
+      if (current.length) {
+        blocks.push(current);
+        current = [];
+      }
+    } else {
+      current.push(line);
+    }
+  }
+  if (current.length) blocks.push(current);
+
+  const result = [];
+  blocks.forEach((block, i) => {
+    const lines = block.map((s) => s.trimEnd());
+    const first = lines.findIndex((l) => l.trim());
+    if (first === -1) return;
+    const title = lines[first].trim();
+    const content = lines.slice(first + 1).join("\n").trim();
+    if (title && content) result.push({ title, content });
+  });
+  return result;
+}
+
 function doParse() {
   const text = fullText.value;
   if (!text.trim()) {
     ElMessage.warning("请先粘贴全文或上传 .txt 文件");
     return;
   }
-  const chapters = parseChapters(text);
-  if (chapters.length === 0) {
+  const expected = expectedChapters.value ? Number(expectedChapters.value) : null;
+  const candidates = PARSERS.map((p) => ({
+    label: p.label,
+    chapters: p.parse(text),
+  })).filter((c) => c.chapters.length > 0);
+
+  let chosen = null;
+  if (expected && candidates.length) {
+    for (const c of candidates) {
+      const diff = Math.abs(c.chapters.length - expected);
+      if (!chosen || diff < chosen.diff) {
+        chosen = { ...c, diff };
+      }
+    }
+  } else {
+    chosen = candidates[0] || null;
+  }
+
+  if (!chosen) {
     parsedChapters.value = [];
+    parseMethodLabel.value = "";
     parseHint.value = "未能识别到章节内容，请检查文本格式";
     return;
   }
-  if (chapters.length > MAX_CHAPTERS) {
+  if (chosen.chapters.length > MAX_CHAPTERS) {
     parsedChapters.value = [];
+    parseMethodLabel.value = "";
     parseHint.value = `章节数超过上限（${MAX_CHAPTERS} 章），请拆分后再投稿`;
     return;
   }
-  const overLong = chapters.find((c) => c.content.length > MAX_CHAPTER_CHARS);
+  const overLong = chosen.chapters.find((c) => c.content.length > MAX_CHAPTER_CHARS);
   if (overLong) {
     parsedChapters.value = [];
+    parseMethodLabel.value = "";
     parseHint.value = `《${overLong.title}》正文超过单章 ${MAX_CHAPTER_CHARS} 字上限，请拆分`;
     return;
   }
-  parsedChapters.value = chapters;
+  parsedChapters.value = chosen.chapters;
+  parseMethodLabel.value = chosen.label;
   parseHint.value = "";
-  ElMessage.success(`解析完成，共识别到 ${chapters.length} 章`);
+  const closest = expected ? "（与填写章节数最接近）" : "";
+  ElMessage.success(`解析完成，共识别到 ${chosen.chapters.length} 章，按「${chosen.label}」解析${closest}`);
 }
 
 function onTxtPick(options) {
@@ -157,7 +239,9 @@ function resetAll() {
   form.value = { title: "", author: "", description: "" };
   fullText.value = "";
   parsedChapters.value = [];
+  parseMethodLabel.value = "";
   parseHint.value = "";
+  expectedChapters.value = null;
   coverUrl.value = "";
   submitted.value = false;
 }
@@ -239,6 +323,10 @@ function resetAll() {
               <el-button>选择 .txt 文件</el-button>
             </el-upload>
           </el-form-item>
+          <el-form-item label="当前本书已有章节数">
+            <el-input-number v-model="expectedChapters" :min="1" :max="10000" />
+            <span class="field-hint">选填。本书一共有多少章？填上后会自动选择章节数最接近的解析方式</span>
+          </el-form-item>
 
           <el-form-item>
             <el-button type="primary" @click="doParse">解析章节</el-button>
@@ -250,6 +338,7 @@ function resetAll() {
             <p class="parse-count">
               共识别到 <strong>{{ parsedChapters.length }}</strong> 章
             </p>
+            <p v-if="parseMethodLabel" class="parse-method">解析方式：{{ parseMethodLabel }}</p>
             <div class="parse-list">
               <div v-for="(ch, i) in parsedChapters" :key="i" class="parse-item">
                 <span class="parse-order">{{ i + 1 }}.</span>
@@ -335,6 +424,18 @@ function resetAll() {
 .parse-count {
   margin: 0 0 10px;
   font-weight: 600;
+}
+
+.parse-method {
+  margin: 0 0 10px;
+  color: var(--primary);
+  font-size: 13px;
+}
+
+.field-hint {
+  margin-left: 12px;
+  color: var(--text-light);
+  font-size: 12px;
 }
 
 .parse-list {
