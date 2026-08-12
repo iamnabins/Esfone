@@ -22,6 +22,11 @@ const routes = [
     component: () => import("../views/message-board/index.vue"),
   },
   {
+    path: "/submit",
+    name: "submit",
+    component: () => import("../views/submit/index.vue"),
+  },
+  {
     path: "/admin",
     name: "admin",
     component: () => import("../views/admin/index.vue"),

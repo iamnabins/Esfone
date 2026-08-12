@@ -1,5 +1,5 @@
 <script setup>
-import { nextTick, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import { Moon, Search, Sunny, User } from "@element-plus/icons-vue";
@@ -15,11 +15,14 @@ const searchOpen = ref(false);
 const searchInputRef = ref(null);
 const announcementVisible = ref(false);
 
-const navs = [
+const navs = computed(() => [
   { name: "home", label: "首页", path: "/" },
   { name: "message-board", label: "留言板", path: "/message-board" },
+  ...(auth.isLoggedIn
+    ? [{ name: "submit", label: "投稿", path: "/submit" }]
+    : []),
   { name: "admin", label: "管理后台", path: "/admin" },
-];
+]);
 
 onMounted(() => {
   auth.init();

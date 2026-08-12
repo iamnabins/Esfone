@@ -3,5 +3,6 @@
 from .book import Book
 from .chapter import Chapter
 from .message import Message
+from .submission import Submission
 
-__all__ = ["Book", "Chapter", "Message"]
+__all__ = ["Book", "Chapter", "Message", "Submission"]

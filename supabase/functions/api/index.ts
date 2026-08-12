@@ -19,9 +19,13 @@ const anon = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 
 const MAX_CONTENT_LENGTH = 500;
 const POST_COOLDOWN_SECONDS = 30;
+const MAX_SUBMISSION_CHAPTERS = 500;
+const MAX_CHAPTER_CHARS = 100000;
+const SUBMISSION_COOLDOWN_SECONDS = 60;
 
 // 简易频率限制：记录每个 IP 最近一次发言时间（单实例内存，与 Flask 版行为一致）
 const lastPostAt = new Map<string, number>();
+const lastSubmissionAt = new Map<string, number>();
 
 const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -69,6 +73,33 @@ function clientIp(req: Request): string {
   const forwarded = req.headers.get("x-forwarded-for") ?? "";
   if (forwarded) return forwarded.split(",")[0].trim();
   return "";
+}
+
+/** 校验登录用户令牌，返回用户信息（与 /api/auth/verify 同一套校验） */
+async function requireUser(
+  req: Request,
+): Promise<
+  | { ok: true; user: { id: string; email: string; nickname: string } }
+  | { ok: false; response: Response }
+> {
+  const header = req.headers.get("Authorization") ?? "";
+  if (!header.startsWith("Bearer ")) {
+    return { ok: false, response: json({ error: "请先登录后再投稿" }, 401) };
+  }
+  const token = header.slice(7).trim();
+  const { data, error } = await anon.auth.getUser(token);
+  if (error || !data?.user) {
+    return {
+      ok: false,
+      response: json({ error: "访问令牌无效或已过期，请重新登录" }, 401),
+    };
+  }
+  const meta = data.user.user_metadata ?? {};
+  const email = data.user.email ?? "";
+  const nickname = String(meta.nickname ?? "").trim() ||
+    email.split("@")[0] ||
+    "匿名用户";
+  return { ok: true, user: { id: data.user.id, email, nickname } };
 }
 
 type BookRow = {
@@ -346,6 +377,247 @@ Deno.serve(async (req) => {
           next,
         },
       });
+    } catch (e) {
+      return serverError(e);
+    }
+  }
+
+  // ---------- 投稿 ----------
+  const submissionsMatch = path.match(/^\/api\/submissions\/?$/);
+  const approveMatch = path.match(/^\/api\/submissions\/(\d+)\/approve$/);
+  const rejectMatch = path.match(/^\/api\/submissions\/(\d+)\/reject$/);
+  const submissionDetailMatch = path.match(/^\/api\/submissions\/(\d+)$/);
+
+  if (submissionsMatch && req.method === "POST") {
+    const auth = await requireUser(req);
+    if (!auth.ok) return auth.response;
+    try {
+      const ip = clientIp(req);
+      const now = Date.now() / 1000;
+      const key = auth.user.id || ip;
+      if (
+        now - (lastSubmissionAt.get(key) ?? 0) <
+        SUBMISSION_COOLDOWN_SECONDS
+      ) {
+        return json({ error: "投稿过于频繁，请稍后再试" }, 429);
+      }
+      lastSubmissionAt.set(key, now);
+
+      const data = await readJson(req);
+      const title = String(data.title ?? "").trim();
+      const author = String(data.author ?? "").trim();
+      const description = String(data.description ?? "").trim();
+      if (!title || !author || !description) {
+        return json({ error: "书名、作者和书籍简介不能为空" }, 400);
+      }
+
+      const rawChapters = Array.isArray(data.chapters) ? data.chapters : [];
+      if (!rawChapters.length) {
+        return json({ error: "请至少上传一个章节" }, 400);
+      }
+      if (rawChapters.length > MAX_SUBMISSION_CHAPTERS) {
+        return json(
+          { error: `单次投稿最多 ${MAX_SUBMISSION_CHAPTERS} 章` },
+          400,
+        );
+      }
+
+      const chapters: { title: string; content: string }[] = [];
+      for (const item of rawChapters) {
+        const c = (item ?? {}) as Record<string, unknown>;
+        const t = String(c.title ?? "").trim();
+        const content = String(c.content ?? "").trim();
+        if (!t || !content) {
+          return json({ error: "章节标题和正文不能为空" }, 400);
+        }
+        if (content.length > MAX_CHAPTER_CHARS) {
+          return json(
+            { error: `单章正文不能超过 ${MAX_CHAPTER_CHARS} 字` },
+            400,
+          );
+        }
+        chapters.push({ title: t, content });
+      }
+
+      const { data: row, error } = await db
+        .from("submissions")
+        .insert({
+          title,
+          author,
+          description,
+          cover: String(data.cover ?? "").trim(),
+          user_id: auth.user.id,
+          nickname: auth.user.nickname,
+          chapters,
+          status: "pending",
+          created_at: new Date().toISOString(),
+        })
+        .select("id")
+        .single();
+      if (error) return serverError(error);
+      return json({ ok: true, id: (row as { id: number }).id }, 201);
+    } catch (e) {
+      return serverError(e);
+    }
+  }
+
+  if (submissionsMatch && req.method === "GET") {
+    const denied = adminRequired(req);
+    if (denied) return denied;
+    try {
+      const page = Math.max(1, Number(url.searchParams.get("page") ?? "1") || 1);
+      const per = Math.min(
+        20,
+        Math.max(1, Number(url.searchParams.get("per_page") ?? "10") || 10),
+      );
+      const status = (url.searchParams.get("status") ?? "").trim();
+      let query = db
+        .from("submissions")
+        .select("id, title, author, nickname, status, created_at, chapters", {
+          count: "exact",
+        });
+      if (status) query = query.eq("status", status);
+      const { data, error, count } = await query
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range((page - 1) * per, page * per - 1);
+      if (error) return serverError(error);
+      const rows = (data ?? []) as Array<{
+        id: number;
+        title: string;
+        author: string;
+        nickname: string | null;
+        status: string;
+        created_at: string | null;
+        chapters: unknown[];
+      }>;
+      return json({
+        submissions: rows.map((r) => ({
+          id: r.id,
+          title: r.title,
+          author: r.author,
+          nickname: (r.nickname ?? "").trim() || null,
+          status: r.status,
+          created_at: r.created_at,
+          chapter_count: Array.isArray(r.chapters) ? r.chapters.length : 0,
+        })),
+        total: count ?? rows.length,
+        page,
+        per_page: per,
+      });
+    } catch (e) {
+      return serverError(e);
+    }
+  }
+
+  if (submissionDetailMatch && req.method === "GET") {
+    const denied = adminRequired(req);
+    if (denied) return denied;
+    try {
+      const id = Number(submissionDetailMatch[1]);
+      const { data: sub, error } = await db
+        .from("submissions")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
+      if (error) return serverError(error);
+      if (!sub) return json({ error: "投稿不存在" }, 404);
+      const chapters = Array.isArray(sub.chapters) ? sub.chapters : [];
+      return json({
+        submission: {
+          ...sub,
+          chapter_count: chapters.length,
+        },
+      });
+    } catch (e) {
+      return serverError(e);
+    }
+  }
+
+  if (approveMatch && req.method === "POST") {
+    const denied = adminRequired(req);
+    if (denied) return denied;
+    try {
+      const id = Number(approveMatch[1]);
+      const { data: sub, error } = await db
+        .from("submissions")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
+      if (error) return serverError(error);
+      if (!sub) return json({ error: "投稿不存在" }, 404);
+      if (sub.status !== "pending") {
+        return json({ error: "该投稿已处理" }, 400);
+      }
+
+      const chapters = Array.isArray(sub.chapters) ? sub.chapters : [];
+      const { data: book, error: bookErr } = await db
+        .from("books")
+        .insert({
+          title: sub.title,
+          author: sub.author,
+          cover: sub.cover ?? "",
+          description: sub.description ?? "",
+          created_at: new Date().toISOString(),
+        })
+        .select("id")
+        .single();
+      if (bookErr) return serverError(bookErr);
+
+      const chapterRows = chapters.map(
+        (c: unknown, i: number) => {
+          const item = (c ?? {}) as Record<string, unknown>;
+          return {
+            book_id: (book as { id: number }).id,
+            title: String(item.title ?? "").trim(),
+            content: String(item.content ?? "").trim(),
+            order: i + 1,
+            created_at: new Date().toISOString(),
+          };
+        },
+      );
+      const { error: chErr } = await db.from("chapters").insert(chapterRows);
+      if (chErr) {
+        // 章节写入失败时回滚已创建的书籍，避免残留空书
+        await db.from("books").delete().eq("id", (book as { id: number }).id);
+        return serverError(chErr);
+      }
+
+      const { error: upErr } = await db
+        .from("submissions")
+        .update({
+          status: "approved",
+          approved_book_id: (book as { id: number }).id,
+        })
+        .eq("id", id);
+      if (upErr) return serverError(upErr);
+      return json({ ok: true, book_id: (book as { id: number }).id });
+    } catch (e) {
+      return serverError(e);
+    }
+  }
+
+  if (rejectMatch && req.method === "POST") {
+    const denied = adminRequired(req);
+    if (denied) return denied;
+    try {
+      const id = Number(rejectMatch[1]);
+      const { data: sub, error } = await db
+        .from("submissions")
+        .select("id, status")
+        .eq("id", id)
+        .maybeSingle();
+      if (error) return serverError(error);
+      if (!sub) return json({ error: "投稿不存在" }, 404);
+      if (sub.status !== "pending") {
+        return json({ error: "该投稿已处理" }, 400);
+      }
+      const { error: upErr } = await db
+        .from("submissions")
+        .update({ status: "rejected" })
+        .eq("id", id);
+      if (upErr) return serverError(upErr);
+      return json({ ok: true });
     } catch (e) {
       return serverError(e);
     }
